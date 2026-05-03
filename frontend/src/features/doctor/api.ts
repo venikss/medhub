@@ -1,4 +1,4 @@
-﻿import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import type { Encounter } from "@/types";
 
 interface PaginatedResponse<T> {
@@ -206,7 +206,7 @@ function withQuery(path: string, params: Record<string, string | number | boolea
 
   Object.entries(params).forEach(([key, value]) => {
     if (value && value !== "all") {
-      search.set(key, value);
+      search.set(key, String(value));
     }
   });
 
@@ -233,7 +233,7 @@ async function getPaginatedList<T>(path: string, token?: string | null): Promise
   return [];
 }
 
-function mapEncounter(encounter: {
+type DoctorEncounterResponse = {
   id: string;
   patientId: string;
   patientName?: string;
@@ -247,7 +247,9 @@ function mapEncounter(encounter: {
   plan: string;
   signedAt?: string | null;
   createdAt?: string;
-}) {
+};
+
+function mapEncounter(encounter: DoctorEncounterResponse) {
   return {
     id: encounter.id,
     patientId: encounter.patientId,
@@ -269,21 +271,8 @@ export function listDoctorEncounters(
   query: { patientId?: string; doctorId?: string; status?: string } = {},
   token?: string,
 ) {
-  return getPaginatedList<{
-    id: string;
-    patientId: string;
-    patientName?: string;
-    doctorId?: string;
-    doctorName?: string;
-    type: Encounter["visitType"];
-    status: Encounter["status"];
-    subjective: string;
-    objective: string;
-    assessment: string;
-    plan: string;
-    signedAt?: string | null;
-    createdAt?: string;
-  }>(withQuery("/doctors/encounters/", query), token).then((items) => items.map(mapEncounter));
+  return getPaginatedList<DoctorEncounterResponse>(withQuery("/doctors/encounters/", query), token)
+    .then((items) => items.map(mapEncounter));
 }
 
 export function createDoctorEncounter(
@@ -297,15 +286,32 @@ export function createDoctorEncounter(
   },
   token?: string,
 ) {
-  return apiFetch("/doctors/encounters/", {
+  return apiFetch<DoctorEncounterResponse>("/doctors/encounters/", {
     method: "POST",
     token,
     body: JSON.stringify(payload),
   }).then(mapEncounter);
 }
 
+export function updateDoctorEncounter(
+  encounterId: string,
+  payload: {
+    subjective?: string;
+    objective?: string;
+    assessment?: string;
+    plan?: string;
+  },
+  token?: string,
+) {
+  return apiFetch<DoctorEncounterResponse>(`/doctors/encounters/${encounterId}/`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify(payload),
+  }).then(mapEncounter);
+}
+
 export function signDoctorEncounter(encounterId: string, token?: string) {
-  return apiFetch(`/doctors/encounters/${encounterId}/sign/`, {
+  return apiFetch<DoctorEncounterResponse>(`/doctors/encounters/${encounterId}/sign/`, {
     method: "POST",
     token,
   }).then(mapEncounter);
@@ -393,12 +399,16 @@ export function listDoctorOrders(
 export function createDoctorOrder(
   payload: {
     patientId: string;
+    encounterId?: string;
     category: string;
     orderableName?: string;
     priority: string;
     instructions?: string;
     bodyPart?: string;
     examCode?: string;
+    indication?: string;
+    clinicalHistory?: string;
+    specimenType?: string;
   },
   token?: string,
 ) {

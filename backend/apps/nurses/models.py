@@ -21,6 +21,10 @@ class Vitals(TimeStampedModel):
     pain_score = models.PositiveIntegerField(null=True, blank=True)  # 0-10
     gcs = models.PositiveIntegerField(null=True, blank=True)  # Glasgow Coma Scale
     news2_score = models.PositiveIntegerField(null=True, blank=True)
+    is_admission_vitals = models.BooleanField(
+        default=False,
+        help_text="True when this is the baseline vitals recorded at the time of admission.",
+    )
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
     )

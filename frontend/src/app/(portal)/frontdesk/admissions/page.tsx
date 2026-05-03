@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BedDouble, ArrowRightLeft, LogOut, UserPlus, Search } from "lucide-react";
+import { BedDouble, ArrowRightLeft, LogOut, UserPlus, Search, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,7 @@ export default function AdmissionsPage() {
 
   // -- New Admission dialog --
   const [admitDialog, setAdmitDialog] = useState(false);
-  const [admitStep, setAdmitStep] = useState<"patient" | "details">("patient");
+  const [admitStep, setAdmitStep] = useState<"patient" | "details" | "vitals">("patient");
   const [admitPatients, setAdmitPatients] = useState<Patient[]>([]);
   const [admitSearch, setAdmitSearch] = useState("");
   const [admitSelectedPatient, setAdmitSelectedPatient] = useState<Patient | null>(null);
@@ -51,6 +51,20 @@ export default function AdmissionsPage() {
   const [departments, setDepartments] = useState<AdminDepartment[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
   const [admitBeds, setAdmitBeds] = useState<BedInfo[]>([]);
+
+  // -- Admission vitals step --
+  const [admitCreated, setAdmitCreated] = useState<{ id: string; patientId: string; patientName: string } | null>(null);
+  const [vSystolic, setVSystolic] = useState("");
+  const [vDiastolic, setVDiastolic] = useState("");
+  const [vHr, setVHr] = useState("");
+  const [vSpo2, setVSpo2] = useState("");
+  const [vTemp, setVTemp] = useState("");
+  const [vRr, setVRr] = useState("");
+  const [vPain, setVPain] = useState("");
+  const [vGcs, setVGcs] = useState("");
+  const [vNotes, setVNotes] = useState("");
+  const [vSubmitting, setVSubmitting] = useState(false);
+  const [vDone, setVDone] = useState(false);
 
   // -- Discharge dialog --
   const [dischargeDialog, setDischargeDialog] = useState<Admission | null>(null);
@@ -150,6 +164,10 @@ export default function AdmissionsPage() {
     setAdmitBedId("");
     setAdmitStep("patient");
     setAdmitDialog(true);
+    setAdmitCreated(null);
+    setVSystolic(""); setVDiastolic(""); setVHr(""); setVSpo2("");
+    setVTemp(""); setVRr(""); setVPain(""); setVGcs(""); setVNotes("");
+    setVSubmitting(false); setVDone(false);
     // Fetch lookup data in parallel
     void getFrontDeskAdmissionLookups({}, token)
       .then((lookup) => {
@@ -199,12 +217,49 @@ export default function AdmissionsPage() {
       if (admitBedId) payload.bedId = admitBedId;
       const created = await createAdmission(payload, token);
       setAdmissions((current) => [created, ...current]);
-      setAdmitDialog(false);
-      showAlert("Success", `Admission created for ${created.patientName}.`);
+      // Transition to vitals entry step
+      setAdmitCreated({ id: created.id, patientId: created.patientId, patientName: created.patientName });
+      setAdmitStep("vitals");
     } catch (error) {
       showAlert("Error", error instanceof Error ? error.message : "We couldn't create the admission.");
     } finally {
       setAdmitSubmitting(false);
+    }
+  }
+
+  async function submitAdmissionVitals(skip = false) {
+    if (skip || !token || !admitCreated) {
+      setAdmitDialog(false);
+      if (!skip) showAlert("Admission Created", `${admitCreated?.patientName ?? "Patient"} has been admitted. Vitals can be entered from the nurse station.`);
+      return;
+    }
+    setVSubmitting(true);
+    try {
+      const body: Record<string, unknown> = {
+        patient: admitCreated.patientId,
+        is_admission_vitals: true,
+      };
+      if (vSystolic) body.systolic = Number(vSystolic);
+      if (vDiastolic) body.diastolic = Number(vDiastolic);
+      if (vHr) body.heart_rate = Number(vHr);
+      if (vSpo2) body.spo2 = Number(vSpo2);
+      if (vTemp) body.temperature = Number(vTemp);
+      if (vRr) body.respiratory_rate = Number(vRr);
+      if (vPain) body.pain_score = Number(vPain);
+      if (vGcs) body.gcs = Number(vGcs);
+      if (vNotes) body.notes = vNotes;
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api"}/nurses/vitals/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      setVDone(true);
+      setTimeout(() => setAdmitDialog(false), 1200);
+    } catch {
+      showAlert("Vitals Error", "Admission created but vitals could not be saved. Please enter them from the nurse station.");
+      setAdmitDialog(false);
+    } finally {
+      setVSubmitting(false);
     }
   }
 
@@ -300,12 +355,24 @@ export default function AdmissionsPage() {
       </Dialog>
 
       {/* New Admission Dialog */}
-      <Dialog open={admitDialog} onOpenChange={setAdmitDialog}>
+      <Dialog open={admitDialog} onOpenChange={(open) => { if (!open) setAdmitDialog(false); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>New Admission</DialogTitle>
+            <DialogTitle>
+              {admitStep === "patient" && "New Admission"}
+              {admitStep === "details" && "Admission Details"}
+              {admitStep === "vitals" && (
+                <span className="flex items-center gap-2"><Activity className="h-4 w-4 text-emerald-600" /> Record Admission Vitals</span>
+              )}
+            </DialogTitle>
             <DialogDescription>
-              {admitStep === "patient" ? "Search and select a patient" : `Admission details for ${admitSelectedPatient?.fullName ?? `${admitSelectedPatient?.firstName} ${admitSelectedPatient?.lastName}`}`}
+              {admitStep === "patient" && "Search and select a patient"}
+              {admitStep === "details" && `Admission details for ${admitSelectedPatient?.fullName ?? `${admitSelectedPatient?.firstName} ${admitSelectedPatient?.lastName}`}`}
+              {admitStep === "vitals" && (
+                <span className="text-emerald-700 font-medium">
+                  ✓ {admitCreated?.patientName} admitted. Enter baseline vitals now or skip to enter later.
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -421,12 +488,77 @@ export default function AdmissionsPage() {
             </div>
           )}
 
+          {admitStep === "vitals" && (
+            <div className="space-y-3">
+              {vDone ? (
+                <div className="flex flex-col items-center gap-2 py-6">
+                  <span className="text-4xl">✅</span>
+                  <p className="text-sm font-medium text-emerald-700">Vitals saved successfully!</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Systolic BP (mmHg)</Label>
+                      <Input type="number" placeholder="120" value={vSystolic} onChange={e => setVSystolic(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Diastolic BP (mmHg)</Label>
+                      <Input type="number" placeholder="80" value={vDiastolic} onChange={e => setVDiastolic(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Heart Rate (bpm)</Label>
+                      <Input type="number" placeholder="72" value={vHr} onChange={e => setVHr(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">SpO₂ (%)</Label>
+                      <Input type="number" placeholder="98" value={vSpo2} onChange={e => setVSpo2(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Temperature (°C)</Label>
+                      <Input type="number" step="0.1" placeholder="36.6" value={vTemp} onChange={e => setVTemp(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Respiratory Rate (/min)</Label>
+                      <Input type="number" placeholder="16" value={vRr} onChange={e => setVRr(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Pain Score (0–10)</Label>
+                      <Input type="number" min={0} max={10} placeholder="0" value={vPain} onChange={e => setVPain(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">GCS (3–15)</Label>
+                      <Input type="number" min={3} max={15} placeholder="15" value={vGcs} onChange={e => setVGcs(e.target.value)} className="mt-1" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Notes <span className="text-muted-foreground">(optional)</span></Label>
+                    <Textarea rows={2} className="mt-1 text-xs resize-none" placeholder="Any additional admission notes..." value={vNotes} onChange={e => setVNotes(e.target.value)} />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">These will be saved as the baseline admission vitals and linked to the patient KG.</p>
+                </>
+              )}
+            </div>
+          )}
+
           <DialogFooter>
             {admitStep === "details" && (
               <>
                 <Button variant="outline" onClick={() => setAdmitStep("patient")}>Back</Button>
                 <Button onClick={() => void submitAdmission()} disabled={admitSubmitting}>
                   {admitSubmitting ? "Creating..." : "Create Admission"}
+                </Button>
+              </>
+            )}
+            {admitStep === "vitals" && !vDone && (
+              <>
+                <Button variant="ghost" className="text-xs" onClick={() => void submitAdmissionVitals(true)}>Skip for Now</Button>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700 gap-1.5"
+                  disabled={vSubmitting || (!vSystolic && !vHr && !vSpo2 && !vTemp)}
+                  onClick={() => void submitAdmissionVitals(false)}
+                >
+                  {vSubmitting ? "Saving..." : <><Activity className="h-3.5 w-3.5" /> Save Vitals</>}
                 </Button>
               </>
             )}

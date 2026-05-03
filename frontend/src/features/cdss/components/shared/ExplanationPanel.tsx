@@ -80,7 +80,19 @@ interface ExplanationPanelProps {
  * Same interface as the hub version — use in any module context.
  */
 export function ExplanationPanel({ rec }: ExplanationPanelProps) {
-  const { explanation, evidenceSources, suggestedActions } = rec;
+  const { evidenceSources, suggestedActions } = rec;
+
+  // Defensive defaults — older records and AI-generated alerts may have
+  // partial or empty explanation JSON from different source modules.
+  const explanation = rec.explanation ?? {};
+  const reasoning: string[]      = Array.isArray(explanation.reasoning)      ? explanation.reasoning      : explanation.reasoning ? [String(explanation.reasoning)] : [];
+  const limitations: string[]    = Array.isArray(explanation.limitations)    ? explanation.limitations    : [];
+  const clinicalInputs: {label: string; value: string; flag?: string}[] =
+    Array.isArray(explanation.clinicalInputs) ? explanation.clinicalInputs : [];
+  const summary: string          = explanation.summary   ?? rec.summary ?? "";
+  const confidence               = explanation.confidence ?? "low";
+  const confidenceScore: number  = typeof explanation.confidenceScore === "number" ? explanation.confidenceScore : 0;
+  const modelVersion: string | undefined = explanation.modelVersion;
 
   return (
     <div className="space-y-4">
@@ -106,19 +118,20 @@ export function ExplanationPanel({ rec }: ExplanationPanelProps) {
         <TabsContent value="reasoning" className="space-y-3 mt-3">
           <Card className="border-border/40">
             <CardContent className="pt-4 pb-4 space-y-2">
-              <ConfidenceMeter score={explanation.confidenceScore} level={explanation.confidence} />
-              {explanation.modelVersion && (
+              <ConfidenceMeter score={confidenceScore} level={confidence} />
+              {modelVersion && (
                 <p className="text-[10px] text-muted-foreground italic">
-                  Model: {explanation.modelVersion}
+                  Model: {modelVersion}
                 </p>
               )}
             </CardContent>
           </Card>
           <div className="text-xs text-muted-foreground leading-relaxed">
-            {explanation.summary}
+            {summary}
           </div>
+          {reasoning.length > 0 && (
           <ol className="space-y-1.5">
-            {explanation.reasoning.map((step, i) => (
+            {reasoning.map((step, i) => (
               <li key={i} className="flex gap-2 text-xs">
                 <span className="h-5 w-5 shrink-0 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center mt-0.5">
                   {i + 1}
@@ -127,12 +140,13 @@ export function ExplanationPanel({ rec }: ExplanationPanelProps) {
               </li>
             ))}
           </ol>
-          {explanation.limitations.length > 0 && (
+          )}
+          {limitations.length > 0 && (
             <div className="rounded-lg bg-muted/30 px-3 py-2 space-y-1">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
                 Limitations
               </p>
-              {explanation.limitations.map((lim, i) => (
+              {limitations.map((lim, i) => (
                 <p key={i} className="text-xs text-muted-foreground">• {lim}</p>
               ))}
             </div>
@@ -141,13 +155,16 @@ export function ExplanationPanel({ rec }: ExplanationPanelProps) {
 
         {/* Clinical Inputs */}
         <TabsContent value="inputs" className="mt-3">
+          {clinicalInputs.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">No clinical inputs recorded for this alert.</p>
+          ) : (
           <div className="rounded-xl border border-border/50 overflow-hidden text-xs">
             <div className="grid grid-cols-[1fr_1fr_auto] bg-muted/30 border-b border-border/40 px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
               <span>Parameter</span>
               <span>Value</span>
               <span>Flag</span>
             </div>
-            {explanation.clinicalInputs.map((inp, i) => (
+            {clinicalInputs.map((inp, i) => (
               <div
                 key={i}
                 className={cn(
@@ -163,6 +180,7 @@ export function ExplanationPanel({ rec }: ExplanationPanelProps) {
               </div>
             ))}
           </div>
+          )}
         </TabsContent>
 
         {/* Evidence */}

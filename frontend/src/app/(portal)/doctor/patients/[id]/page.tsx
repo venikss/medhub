@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, Plus, Pill, ClipboardList, Activity, ChevronRight, Calendar, Network } from "lucide-react";
+import { ArrowLeft, FileText, Plus, Pill, ClipboardList, Activity, ChevronRight, Calendar, Network, BrainCircuit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,8 @@ import { DiagnosisCatalogCombobox } from "@/features/doctor/components/Diagnosis
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { createDoctorDiagnosis, getDoctorPatientChart, type DiagnosisCatalogOption, type DoctorChartResult, type DoctorPatientChart } from "@/features/doctor/api";
 import { DoctorCDSSPanel } from "@/features/cdss/components/modules/DoctorCDSSPanel";
+import { PatientReportPanel } from "@/features/cdss/components/shared/PatientReportPanel";
+import { PatientChatPanel } from "@/features/cdss/components/shared/PatientChatPanel";
 import { useCDSSDataHydration } from "@/features/cdss/hooks/useCDSSDataHydration";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +23,7 @@ const tabs = [
   { key: "orders", label: "Orders", icon: Plus },
   { key: "medications", label: "Medications", icon: Pill },
   { key: "results", label: "Results", icon: Activity },
+  { key: "ai", label: "AI Assistant", icon: BrainCircuit },
 ] as const;
 
 function mapResultFlag(flag?: string) {
@@ -383,6 +386,16 @@ export default function PatientChartPage({ params }: { params: Promise<{ id: str
                   );
                 })
               )}
+            </div>
+          )}
+
+          {activeTab === "ai" && (
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <PatientReportPanel patientId={id} />
+              <PatientChatPanel
+                patientId={id}
+                patientName={patient ? `${patient.firstName} ${patient.lastName}` : undefined}
+              />
             </div>
           )}
         </div>

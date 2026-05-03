@@ -19,6 +19,40 @@ class GraphService:
         results, _ = db.cypher_query(query, params or {})
         return results or []
 
+    # ------------------------------------------------------------------
+    # Drug safety graph queries (DDI, allergy cross-reactivity, risk groups)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def get_patient_ddi_alerts(patient_uuid: str) -> list[dict]:
+        """Return pairwise DDI alerts for a patient's current prescriptions."""
+        from apps.cdss.services.drug_knowledge_service import DrugKnowledgeService
+        return DrugKnowledgeService.get_patient_ddi_alerts(patient_uuid)
+
+    @staticmethod
+    def get_patient_allergy_drug_alerts(patient_uuid: str) -> list[dict]:
+        """Return allergen cross-reactivity alerts (allergy → prescribed drug group match)."""
+        from apps.cdss.services.drug_knowledge_service import DrugKnowledgeService
+        return DrugKnowledgeService.get_patient_allergy_drug_alerts(patient_uuid)
+
+    @staticmethod
+    def get_patient_risk_group_alerts(patient_uuid: str) -> list[dict]:
+        """Return pharmacological risk-group alerts (e.g. two QT-prolonging drugs prescribed)."""
+        from apps.cdss.services.drug_knowledge_service import DrugKnowledgeService
+        return DrugKnowledgeService.get_patient_risk_group_alerts(patient_uuid)
+
+    @staticmethod
+    def get_drug_knowledge_graph_stats() -> dict:
+        """Return counts of drug KG nodes and relationships for dashboards."""
+        return {
+            "drug_nodes": GraphService._count_scalar("MATCH (m:MedicationNode) RETURN count(m)"),
+            "drug_class_nodes": GraphService._count_scalar("MATCH (c:DrugClassNode) RETURN count(c)"),
+            "ddi_pairs": GraphService._count_scalar(
+                "MATCH ()-[r:INTERACTS_WITH]->() RETURN count(r)"
+            ) // 2,  # bi-directional, so halve for unique pairs
+            "allergen_groups": GraphService._count_scalar("MATCH (g:AllergyCrossReactivityGroupNode) RETURN count(g)"),
+            "risk_groups": GraphService._count_scalar("MATCH (g:DrugInteractionGroupNode) RETURN count(g)"),
+        }
+
     @staticmethod
     def get_patient_structured_snapshot(patient_uuid: str) -> dict:
         query = """
@@ -197,10 +231,118 @@ class GraphService:
         if not context_sentences:
             return "Patient exists in the knowledge graph but has no known medical relationships."
 
+        context_sentences.extend(GraphService._get_vitals_context_sentences(patient_uuid))
+
         return "Knowledge Graph Extract:\n- " + "\n- ".join(dict.fromkeys(context_sentences))
 
     @staticmethod
-    def get_raw_graph_for_visualization():
+    def _get_vitals_context_sentences(patient_uuid: str) -> list[str]:
+        """
+        Pull the latest vitals from the Django ORM and return them as
+        clinical context sentences for LLM injection.
+        """
+        try:
+            from apps.nurses.models import Vitals
+            v = (
+                Vitals.objects
+                .filter(patient_id=patient_uuid)
+                .order_by("-recorded_at")
+                .first()
+            )
+            if not v:
+                return []
+            parts = []
+            if v.systolic and v.diastolic:
+                parts.append(f"BP {v.systolic}/{v.diastolic} mmHg")
+            if v.heart_rate:
+                parts.append(f"HR {v.heart_rate} bpm")
+            if v.spo2:
+                parts.append(f"SpO\u2082 {v.spo2}%")
+            if v.temperature:
+                parts.append(f"Temp {float(v.temperature):.1f}\u00b0C")
+            if v.respiratory_rate:
+                parts.append(f"RR {v.respiratory_rate}/min")
+            if v.pain_score is not None:
+                parts.append(f"Pain {v.pain_score}/10")
+            if v.gcs:
+                parts.append(f"GCS {v.gcs}/15")
+            if v.news2_score is not None:
+                parts.append(f"NEWS2 score {v.news2_score}")
+            if not parts:
+                return []
+            label = "Admission baseline vitals" if v.is_admission_vitals else "Latest recorded vitals"
+            recorded = v.recorded_at.strftime("%Y-%m-%d %H:%M") if v.recorded_at else "recently"
+            return [f"{label} ({recorded}): {', '.join(parts)}."]
+        except Exception:
+            return []
+
+    @staticmethod
+    def get_patient_latest_vitals_dict(patient_uuid: str) -> dict | None:
+        """Return the latest vitals as a dict for API / frontend display."""
+        try:
+            from apps.nurses.models import Vitals
+            v = (
+                Vitals.objects
+                .filter(patient_id=patient_uuid)
+                .order_by("-recorded_at")
+                .first()
+            )
+            if not v:
+                return None
+            return {
+                "recordedAt": v.recorded_at.isoformat() if v.recorded_at else None,
+                "isAdmissionVitals": v.is_admission_vitals,
+                "systolic": v.systolic,
+                "diastolic": v.diastolic,
+                "heartRate": v.heart_rate,
+                "spo2": v.spo2,
+                "temperature": float(v.temperature) if v.temperature else None,
+                "respiratoryRate": v.respiratory_rate,
+                "painScore": v.pain_score,
+                "gcs": v.gcs,
+                "news2Score": v.news2_score,
+                "notes": v.notes,
+            }
+        except Exception:
+            return None
+
+    @staticmethod
+    def get_patient_encounter_context(patient_uuid: str, max_encounters: int = 3) -> str:
+        """
+        Return the most recent SOAP encounters for a patient as a plain-text
+        context block suitable for LLM injection.
+        """
+        query = """
+        MATCH (p:PatientNode {uid: $uid})-[r:HAS_ENCOUNTER]->(e:EncounterNode)
+        RETURN e.encounter_uid AS uid, e.visit_type AS vtype, e.status AS status,
+               e.subjective AS s, e.objective AS o, e.assessment AS a, e.plan AS pl,
+               e.doctor_name AS doctor, r.created_at AS created_at
+        ORDER BY r.created_at DESC
+        LIMIT $limit
+        """
+        results, _ = db.cypher_query(
+            query, {"uid": patient_uuid, "limit": max_encounters}
+        )
+
+        if not results:
+            return "No encounter notes found in the knowledge graph for this patient."
+
+        lines = ["Recent Encounter Notes (SOAP):"]
+        for row in results:
+            uid, vtype, status, s, o, a, pl, doctor, created_at = row
+            lines.append(f"\n--- Encounter ({vtype or 'visit'}, {status or 'unknown'}) by {doctor or 'physician'} ---")
+            if s:
+                lines.append(f"  Subjective: {s}")
+            if o:
+                lines.append(f"  Objective:  {o}")
+            if a:
+                lines.append(f"  Assessment: {a}")
+            if pl:
+                lines.append(f"  Plan:       {pl}")
+
+        return "\n".join(lines)
+
+
         query = """
         MATCH (n)
         OPTIONAL MATCH (n)-[r]->(m)
@@ -268,7 +410,7 @@ class GraphService:
 
         def build_label(group: str, props: dict) -> str:
             if group == "PatientNode":
-                return props.get("display_name") or props.get("uid", "Patient")
+                return props.get("full_name") or props.get("display_name") or props.get("uid", "Patient")
             if group == "DiseaseNode":
                 return props.get("name", "Condition")
             if group == "MedicationNode":

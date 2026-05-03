@@ -5,7 +5,7 @@ from neomodel import db
 
 from apps.cdss.services.graph_sync_service import GraphSyncService
 from apps.cdss.services.rule_engine_service import GraphRuleEngineService
-from apps.doctors.models import Diagnosis, Prescription
+from apps.doctors.models import Diagnosis, Encounter, Prescription
 from apps.laboratory.models import CriticalValue, LabTestResult
 from apps.nurses.models import Task, Vitals
 from apps.patients.models import Patient
@@ -38,9 +38,31 @@ def sync_diagnosis_to_graph(sender, instance, created, **kwargs):
     if not created and instance.status != "active":
         return
 
-    with db.transaction:
-        GraphSyncService.sync_diagnosis(instance)
+    # Always update PG ontology catalog (no Neo4j dependency)
+    from apps.cdss.services.ontology_service import OntologyService
+    try:
+        OntologyService.sync_diagnosis_ontology(instance)
+    except Exception:
+        pass
+
+    # Best-effort Neo4j KG sync — must not break the diagnosis save
+    try:
+        with db.transaction:
+            GraphSyncService.sync_diagnosis(instance)
+    except Exception:
+        pass
+
     _schedule_rule_refresh(instance.patient_id)
+
+
+@receiver(post_save, sender=Encounter)
+def sync_encounter_to_graph(sender, instance, **kwargs):
+    """Sync encounter SOAP notes to Neo4j so the AI has current context."""
+    try:
+        with db.transaction:
+            GraphSyncService.sync_encounter(instance)
+    except Exception:
+        pass  # KG sync failure must not break encounter save
 
 
 @receiver(post_save, sender=Prescription)

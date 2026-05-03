@@ -523,8 +523,9 @@ class CDSSAIConsultView(APIView):
         prompt_query = request.data.get("prompt")
         if not prompt_query:
             raise ValidationAppError("prompt is required.")
-        
-        response = AIService.generate_cdss_recommendation(str(patient_pk), prompt_query)
+
+        role = getattr(request.user, "role", "doctor") or "doctor"
+        response = AIService.generate_cdss_recommendation(str(patient_pk), prompt_query, role=role)
         
         return Response({
             "query": prompt_query,
@@ -552,3 +553,262 @@ class CDSSRuleRefreshView(APIView):
             "graphSnapshot": outcome["graphSnapshot"],
             "recommendations": serialized,
         }, status=status.HTTP_200_OK)
+
+
+class CDSSPatientReportView(APIView):
+    """
+    POST /cdss/patients/:id/report/
+    Generates a comprehensive NLP narrative report for the patient using MedGemma.
+    The report style adapts to the caller's role (doctor vs pharmacist).
+    """
+    permission_classes = [IsAuthenticated, IsClinicalStaff | IsPharmacist | IsAdmin]
+
+    def post(self, request, patient_pk):
+        role = getattr(request.user, "role", "doctor") or "doctor"
+        report = AIService.generate_patient_report(str(patient_pk), role=role)
+        return Response({"report": report, "role": role}, status=status.HTTP_200_OK)
+
+
+class CDSSChatView(APIView):
+    """
+    POST /cdss/patients/:id/chat/
+    Multi-turn chat with MedGemma grounded in the patient's live KG context.
+
+    Body: { "message": "...", "history": [{role, content}, ...] }
+    Returns: { "response": "...", "history": [...updated...] }
+    """
+    permission_classes = [IsAuthenticated, IsClinicalStaff | IsPharmacist | IsAdmin]
+
+    def post(self, request, patient_pk):
+        user_message = request.data.get("message", "").strip()
+        if not user_message:
+            raise ValidationAppError("message is required.")
+
+        history = request.data.get("history", [])
+        if not isinstance(history, list):
+            history = []
+
+        role = getattr(request.user, "role", "doctor") or "doctor"
+
+        response, updated_history = AIService.chat_with_context(
+            str(patient_pk),
+            user_message,
+            history,
+            role=role,
+        )
+        return Response(
+            {"response": response, "history": updated_history},
+            status=status.HTTP_200_OK,
+        )
+
+
+class CDSSEncounterSuggestView(APIView):
+    """
+    POST /cdss/encounters/:encounter_id/suggest/
+
+    Analyse a SOAP encounter note with the patient's full KG context and return
+    AI-suggested differential diagnoses, assessment text, and plan text.
+
+    Body (optional — if omitted, reads from the saved encounter):
+      { "subjective": "...", "objective": "...", "assessment": "...", "plan": "..." }
+
+    Returns:
+      {
+        "encounter_id": "...",
+        "differential": ["1. Pneumonia — ...", "2. ..."],
+        "assessment": "Suggested assessment text",
+        "plan": "Suggested plan text",
+        "alerts": "Any safety alerts",
+        "raw": "Full LLM response"
+      }
+    """
+    permission_classes = [IsAuthenticated, IsDoctor | IsAdmin]
+
+    def post(self, request, encounter_pk):
+        from apps.doctors.models import Encounter
+
+        try:
+            encounter = Encounter.objects.select_related("patient", "doctor").get(
+                id=encounter_pk
+            )
+        except Encounter.DoesNotExist:
+            raise NotFoundError("Encounter not found.")
+
+        # Use body data if provided (in-progress note not yet saved),
+        # otherwise fall back to the saved encounter fields.
+        subjective = request.data.get("subjective", encounter.subjective or "")
+        objective = request.data.get("objective", encounter.objective or "")
+        existing_assessment = request.data.get("assessment", encounter.assessment or "")
+        existing_plan = request.data.get("plan", encounter.plan or "")
+
+        if not subjective and not objective:
+            raise ValidationAppError(
+                "Both Subjective and Objective sections are empty. "
+                "Please fill in at least one section before requesting AI suggestions."
+            )
+
+        result = AIService.suggest_encounter_assessment(
+            encounter_id=str(encounter_pk),
+            patient_uuid=str(encounter.patient.id),
+            subjective=subjective,
+            objective=objective,
+            existing_assessment=existing_assessment,
+            existing_plan=existing_plan,
+        )
+
+        write_audit_log(
+            request, AuditAction.READ, "CDSSEncounterSuggest", str(encounter_pk),
+            details={"patient_id": str(encounter.patient.id)}
+        )
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+
+class PharmacyRxAISuggestView(APIView):
+    """
+    POST /cdss/prescriptions/:prescription_id/ai_suggest/
+    Body: { "patientId": "...", "medication": "...", "dose": "...", "route": "...",
+            "frequency": "...", "sig": "...", "indication": "..." }
+    Returns AI-assisted pharmacy verification analysis powered by MedGemma + KG.
+    """
+    permission_classes = [IsAuthenticated, IsPharmacist | IsClinicalStaff | IsAdmin]
+
+    def post(self, request, prescription_pk):
+        patient_id = request.data.get("patientId")
+        if not patient_id:
+            raise ValidationAppError("patientId is required.")
+
+        rx = {
+            "medication": request.data.get("medication", ""),
+            "dose": request.data.get("dose", ""),
+            "route": request.data.get("route", ""),
+            "frequency": request.data.get("frequency", ""),
+            "sig": request.data.get("sig", ""),
+            "indication": request.data.get("indication", ""),
+        }
+
+        result = AIService.suggest_rx_verification(str(patient_id), rx)
+        write_audit_log(
+            request, AuditAction.READ, "PharmacyRxAISuggest", str(prescription_pk),
+            details={"patientId": str(patient_id), "medication": rx["medication"]}
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class LabResultAISuggestView(APIView):
+    """
+    POST /cdss/lab-panels/:panel_id/ai_suggest/
+    Body: { "patientId": "...", "panelName": "...", "results": [{testName, value, unit, referenceRange, flag}, ...] }
+    Returns AI-assisted lab result interpretation powered by MedGemma + KG.
+    """
+    permission_classes = [IsAuthenticated, IsClinicalStaff | IsAdmin]
+
+    def post(self, request, panel_pk):
+        patient_id = request.data.get("patientId")
+        panel_name = request.data.get("panelName", "Lab Panel")
+        results = request.data.get("results", [])
+
+        if not patient_id:
+            raise ValidationAppError("patientId is required.")
+        if not isinstance(results, list) or len(results) == 0:
+            raise ValidationAppError("results must be a non-empty list.")
+
+        result = AIService.suggest_lab_interpretation(str(patient_id), panel_name, results)
+        write_audit_log(
+            request, AuditAction.READ, "LabResultAISuggest", str(panel_pk),
+            details={"patientId": str(patient_id), "panelName": panel_name}
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# Accept AI Diagnosis — creates a Diagnosis record + syncs to ontology catalog
+# ---------------------------------------------------------------------------
+
+class CDSSAcceptAIDiagnosisView(APIView):
+    """
+    POST /cdss/encounters/:encounter_pk/accept_diagnosis/
+
+    Doctor accepts one differential diagnosis suggestion produced by MedGemma.
+    Creates a formal Diagnosis record (type=differential, status=suspected by
+    default) which triggers the existing post_save signal chain:
+      sync_diagnosis_to_graph → OntologyService.sync_diagnosis_ontology
+    so the disease is automatically added to the ontology catalog.
+
+    Body:
+      {
+        "diagnosis":     str   (required — disease name),
+        "icd10Code":     str   (optional — validated; auto-resolved if omitted),
+        "snomedCode":    str   (optional),
+        "snomedDisplay": str   (optional),
+        "diagnosisType": str   (optional, default: "differential"),
+        "status":        str   (optional, default: "suspected")
+      }
+    """
+    permission_classes = [IsAuthenticated, IsDoctor | IsAdmin]
+
+    def post(self, request, encounter_pk):
+        from apps.doctors.models import Diagnosis, Encounter
+        from apps.doctors.serializers import DiagnosisSerializer
+
+        try:
+            encounter = Encounter.objects.select_related("patient").get(id=encounter_pk)
+        except Encounter.DoesNotExist:
+            raise NotFoundError("Encounter not found.")
+
+        diagnosis_text = (request.data.get("diagnosis") or "").strip()
+        if not diagnosis_text:
+            raise ValidationAppError("diagnosis is required.")
+
+        # ── Resolve ICD-10 code ────────────────────────────────────────────
+        raw_code = (request.data.get("icd10Code") or "").strip().upper()
+        resolved_code = None
+        resolved_description = diagnosis_text
+
+        try:
+            import simple_icd_10 as icd
+
+            if raw_code and icd.is_valid_item(raw_code):
+                resolved_code = raw_code
+                resolved_description = icd.get_description(raw_code) or diagnosis_text
+            else:
+                # Fuzzy search by diagnosis name (cap at 10k codes)
+                search_term = diagnosis_text.lower()
+                for code in icd.get_all_codes()[:10000]:
+                    desc = icd.get_description(code) or ""
+                    if search_term in desc.lower():
+                        resolved_code = code
+                        resolved_description = desc
+                        break
+        except Exception:
+            pass
+
+        if not resolved_code:
+            resolved_code = "R69"  # Illness, unspecified
+
+        # ── Create Diagnosis record ────────────────────────────────────────
+        diagnosis = Diagnosis.objects.create(
+            patient=encounter.patient,
+            encounter=encounter,
+            code=resolved_code,
+            description=resolved_description,
+            type=request.data.get("diagnosisType") or "differential",
+            status=request.data.get("status") or "suspected",
+            diagnosed_by=request.user,
+            snomed_code=request.data.get("snomedCode") or "",
+            snomed_display=request.data.get("snomedDisplay") or "",
+        )
+        # post_save signal fires automatically:
+        # sync_diagnosis_to_graph → GraphSyncService.sync_diagnosis
+        # → OntologyService.sync_diagnosis_ontology
+        # → MedicalOntologyConcept + MedicalOntologyMapping created in catalog
+
+        write_audit_log(
+            request, AuditAction.CREATE, "AIDiagnosisAccepted", str(diagnosis.id),
+            {"encounterId": str(encounter_pk), "icd10Code": resolved_code, "diagnosis": diagnosis_text},
+        )
+        return Response(
+            DiagnosisSerializer(diagnosis, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )

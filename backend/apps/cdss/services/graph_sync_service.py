@@ -6,6 +6,7 @@ from neomodel import db
 from apps.cdss.graph_models import (
     AllergyNode,
     DiseaseNode,
+    EncounterNode,
     ICD10ConceptNode,
     LOINCConceptNode,
     LabResultNode,
@@ -28,13 +29,19 @@ class GraphSyncService:
     @classmethod
     def ensure_patient_node(cls, patient):
         patient_node = PatientNode.nodes.get_or_none(uid=str(patient.id))
+        full_name = (
+            f"{getattr(patient, 'first_name', '') or ''} {getattr(patient, 'last_name', '') or ''}".strip()
+            or str(patient.id)
+        )
         if not patient_node:
             patient_node = PatientNode(
                 uid=str(patient.id),
+                full_name=full_name,
                 age=cls._patient_age(patient),
                 gender=getattr(patient, "gender", "unknown") or "unknown",
             ).save()
         else:
+            patient_node.full_name = full_name
             patient_node.age = cls._patient_age(patient)
             patient_node.gender = getattr(patient, "gender", "unknown") or "unknown"
             patient_node.save()
@@ -101,6 +108,50 @@ class GraphSyncService:
                     "reaction": normalized["reaction"],
                     "severity": normalized["severity"],
                     "source_text": normalized["source_text"],
+                },
+            )
+
+    @classmethod
+    def sync_encounter(cls, encounter):
+        """Sync a doctor Encounter (SOAP note) to Neo4j EncounterNode."""
+        patient_node = cls.ensure_patient_node(encounter.patient)
+
+        encounter_uid = str(encounter.id)
+        doctor_name = (
+            encounter.doctor.get_full_name()
+            or getattr(encounter.doctor, "email", "")
+        )
+
+        enc_node = EncounterNode.nodes.get_or_none(encounter_uid=encounter_uid)
+        if not enc_node:
+            enc_node = EncounterNode(
+                encounter_uid=encounter_uid,
+                visit_type=encounter.visit_type or "",
+                status=encounter.status or "",
+                subjective=(encounter.subjective or "")[:2000],
+                objective=(encounter.objective or "")[:2000],
+                assessment=(encounter.assessment or "")[:2000],
+                plan=(encounter.plan or "")[:2000],
+                doctor_name=doctor_name,
+                created_at=encounter.created_at,
+            ).save()
+        else:
+            enc_node.visit_type = encounter.visit_type or ""
+            enc_node.status = encounter.status or ""
+            enc_node.subjective = (encounter.subjective or "")[:2000]
+            enc_node.objective = (encounter.objective or "")[:2000]
+            enc_node.assessment = (encounter.assessment or "")[:2000]
+            enc_node.plan = (encounter.plan or "")[:2000]
+            enc_node.doctor_name = doctor_name
+            enc_node.save()
+
+        if not patient_node.encounters.is_connected(enc_node):
+            patient_node.encounters.connect(
+                enc_node,
+                {
+                    "created_at": encounter.created_at,
+                    "status": encounter.status or "",
+                    "visit_type": encounter.visit_type or "",
                 },
             )
 

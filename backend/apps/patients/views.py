@@ -43,6 +43,17 @@ from .serializers import (
 from .services import PatientService, AdmissionService
 
 
+def _current_shift() -> str:
+    """Return the current nursing shift based on the local hour."""
+    hour = timezone.localtime().hour
+    if 7 <= hour < 15:
+        return "day"
+    if 15 <= hour < 23:
+        return "evening"
+    return "night"
+
+
+
 PatientReadWritePermission = ReadWriteRolePermission.for_roles(
     [UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.LAB_TECH, UserRole.RADIOLOGIST, UserRole.PHARMACIST, UserRole.BILLING_STAFF, UserRole.FRONT_DESK],
     [UserRole.ADMIN, UserRole.FRONT_DESK],
@@ -304,23 +315,45 @@ class AdmissionListCreateView(APIView):
 
             admission.patient.save(update_fields=patient_update_fields)
 
+            # ── Auto-create STAT admission vitals task for nursing ──────────────
+            try:
+                from apps.nurses.models import Task, TaskStatus
+                room = admission.patient.room_number or "TBD"
+                Task.objects.create(
+                    patient=admission.patient,
+                    room=str(room),
+                    type="admission-vitals",
+                    description=(
+                        f"Record baseline admission vitals for {admission.patient.full_name}. "
+                        f"Admitted to ward {admission.ward.name if admission.ward_id else 'TBD'} "
+                        f"(bed {room}). Includes: BP, HR, SpO2, Temp, RR, Pain score, GCS."
+                    ),
+                    priority="stat",
+                    status=TaskStatus.PENDING,
+                    due_time=timezone.now() + timezone.timedelta(minutes=30),
+                    shift=_current_shift(),
+                )
+            except Exception:
+                pass  # Never block admission creation over a task failure
+            # ───────────────────────────────────────────────────────────────────
+
         # Targeted notification to Admitting and Assigned doctors
         admitting_doctor_id = admission.admitting_doctor_id
         assigned_doctor_id = admission.patient.assigned_doctor_id
-        
+
         payload = {
             "admissionId": str(admission.id),
             "patientId": str(admission.patient_id),
             "patientName": admission.patient.full_name,
             "wardId": str(admission.ward_id) if admission.ward_id else None,
         }
-        
+
         if admitting_doctor_id:
             emit_adt_admission(payload, user_id=str(admitting_doctor_id))
-        
+
         if assigned_doctor_id and str(assigned_doctor_id) != str(admitting_doctor_id):
             emit_adt_admission(payload, user_id=str(assigned_doctor_id))
-            
+
         if not admitting_doctor_id and not assigned_doctor_id:
             emit_adt_admission(payload)
         write_audit_log(request, AuditAction.CREATE, "Admission", str(admission.id))
@@ -328,6 +361,7 @@ class AdmissionListCreateView(APIView):
             AdmissionSerializer(admission, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
+
 
 
 class AdmissionDetailView(APIView):

@@ -276,6 +276,12 @@ neomodel.config.DATABASE_URL = config("NEOMODEL_NEO4J_BOLT_URL", default="bolt:/
 neomodel.config.AUTO_INSTALL_LABELS = True
 
 # ─── LLM Configuration ────────────────────────────────────────────────────────
-LLM_API_URL = config("LLM_API_URL", default="http://host.docker.internal:11434/api/generate")
-LLM_MODEL_NAME = config("LLM_MODEL_NAME", default="medllama2")
-LLM_API_TIMEOUT_SECONDS = config("LLM_API_TIMEOUT_SECONDS", default=30, cast=int)
+# Local MedGemma via mlx_lm.server (OpenAI-compatible endpoint)
+# Start server: mlx_lm server --model .models/medgemma-1_5-4b-it-4bit --port 8081
+LLM_API_URL = config("LLM_API_URL", default="http://localhost:8081/v1/chat/completions")
+# mlx_lm.server uses the full local path as the model ID
+LLM_MODEL_NAME = config(
+    "LLM_MODEL_NAME",
+    default="/Users/khaledsamy/Graduation Project/projKG test/.models/medgemma-1_5-4b-it-4bit",
+)
+LLM_API_TIMEOUT_SECONDS = config("LLM_API_TIMEOUT_SECONDS", default=120, cast=int)

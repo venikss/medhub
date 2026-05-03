@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,11 +8,16 @@ import { Save, CheckCircle2, FileText, Loader2 } from "lucide-react";
 import type { Encounter } from "@/types";
 import { cn } from "@/lib/utils";
 
+export interface EncounterNoteEditorHandle {
+    applyField: (field: "assessment" | "plan", value: string) => void;
+}
+
 interface EncounterNoteEditorProps {
     encounter?: Encounter;
     patientName?: string;
     onSave?: (data: Pick<Encounter, "subjective" | "objective" | "assessment" | "plan">) => Promise<void> | void;
     onSign?: (data: Pick<Encounter, "subjective" | "objective" | "assessment" | "plan">) => Promise<void> | void;
+    onFormChange?: (data: Pick<Encounter, "subjective" | "objective" | "assessment" | "plan">) => void;
     className?: string;
 }
 
@@ -108,7 +113,8 @@ function AutoTextarea({
     );
 }
 
-export function EncounterNoteEditor({ encounter, patientName, onSave, onSign, className }: EncounterNoteEditorProps) {
+export const EncounterNoteEditor = forwardRef<EncounterNoteEditorHandle, EncounterNoteEditorProps>(
+function EncounterNoteEditor({ encounter, patientName, onSave, onSign, onFormChange, className }, ref) {
     const [form, setForm] = useState({
         subjective: encounter?.subjective || "",
         objective: encounter?.objective || "",
@@ -121,10 +127,23 @@ export function EncounterNoteEditor({ encounter, patientName, onSave, onSign, cl
         subjective: null, objective: null, assessment: null, plan: null,
     });
 
+    const onFormChangeRef = useRef(onFormChange);
+    onFormChangeRef.current = onFormChange;
+
     const update = (field: SoapKey, value: string) => {
         setForm((prev) => ({ ...prev, [field]: value }));
         setLastSaved(null);
     };
+
+    // Notify parent of form changes without calling setState during render
+    useEffect(() => {
+        onFormChangeRef.current?.(form);
+    }, [form]);
+
+    // Expose applyField so the AI panel can write assessment/plan back into the editor
+    useImperativeHandle(ref, () => ({
+        applyField: (field: "assessment" | "plan", value: string) => update(field, value),
+    }));
 
     const appendChip = (field: SoapKey, chip: string) => {
         setForm((prev) => {
@@ -231,4 +250,6 @@ export function EncounterNoteEditor({ encounter, patientName, onSave, onSign, cl
             </CardContent>
         </Card>
     );
-}
+});
+
+EncounterNoteEditor.displayName = "EncounterNoteEditor";

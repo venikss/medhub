@@ -22,6 +22,12 @@ from .views import (
     PatientKnowledgeGraphView,
     CDSSAIConsultView,
     CDSSRuleRefreshView,
+    CDSSPatientReportView,
+    CDSSChatView,
+    CDSSEncounterSuggestView,
+    CDSSAcceptAIDiagnosisView,
+    PharmacyRxAISuggestView,
+    LabResultAISuggestView,
 )
 
 urlpatterns = [
@@ -78,4 +84,28 @@ urlpatterns = [
     # Graph-backed rule engine refresh
     path("patients/<uuid:patient_pk>/run_rules", CDSSRuleRefreshView.as_view(), name="cdss-run-rules-noslash"),
     path("patients/<uuid:patient_pk>/run_rules/", CDSSRuleRefreshView.as_view(), name="cdss-run-rules"),
+
+    # NLP patient report
+    path("patients/<uuid:patient_pk>/report", CDSSPatientReportView.as_view(), name="cdss-patient-report-noslash"),
+    path("patients/<uuid:patient_pk>/report/", CDSSPatientReportView.as_view(), name="cdss-patient-report"),
+
+    # Multi-turn chat
+    path("patients/<uuid:patient_pk>/chat", CDSSChatView.as_view(), name="cdss-chat-noslash"),
+    path("patients/<uuid:patient_pk>/chat/", CDSSChatView.as_view(), name="cdss-chat"),
+
+    # Encounter AI suggest (differential diagnosis + assessment + plan)
+    path("encounters/<uuid:encounter_pk>/suggest", CDSSEncounterSuggestView.as_view(), name="cdss-encounter-suggest-noslash"),
+    path("encounters/<uuid:encounter_pk>/suggest/", CDSSEncounterSuggestView.as_view(), name="cdss-encounter-suggest"),
+
+    # Accept AI diagnosis suggestion → creates Diagnosis + syncs to ontology catalog
+    path("encounters/<uuid:encounter_pk>/accept_diagnosis", CDSSAcceptAIDiagnosisView.as_view(), name="cdss-accept-diagnosis-noslash"),
+    path("encounters/<uuid:encounter_pk>/accept_diagnosis/", CDSSAcceptAIDiagnosisView.as_view(), name="cdss-accept-diagnosis"),
+
+    # Pharmacy Rx AI verification suggest
+    path("prescriptions/<uuid:prescription_pk>/ai_suggest", PharmacyRxAISuggestView.as_view(), name="cdss-rx-ai-suggest-noslash"),
+    path("prescriptions/<uuid:prescription_pk>/ai_suggest/", PharmacyRxAISuggestView.as_view(), name="cdss-rx-ai-suggest"),
+
+    # Lab Result AI interpretation suggest
+    path("lab-panels/<uuid:panel_pk>/ai_suggest", LabResultAISuggestView.as_view(), name="cdss-lab-ai-suggest-noslash"),
+    path("lab-panels/<uuid:panel_pk>/ai_suggest/", LabResultAISuggestView.as_view(), name="cdss-lab-ai-suggest"),
 ]

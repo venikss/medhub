@@ -1,4 +1,4 @@
-﻿import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import type {
   CDSSOverrideRecord,
   CDSSPatientModuleGraphSummary,
@@ -235,4 +235,159 @@ export async function respondToCDSSRecommendation(
       sourceModule: data.overrideRecord.sourceModule ?? data.recommendation.sourceModule,
     } satisfies CDSSOverrideRecord,
   };
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function generatePatientReport(
+  patientId: string,
+  token?: string | null,
+): Promise<{ report: string; role: string }> {
+  return apiFetch(`/cdss/patients/${patientId}/report/`, {
+    method: "POST",
+    token,
+  }) as Promise<{ report: string; role: string }>;
+}
+
+export async function chatWithPatient(
+  patientId: string,
+  message: string,
+  history: ChatMessage[],
+  token?: string | null,
+): Promise<{ response: string; history: ChatMessage[] }> {
+  return apiFetch(`/cdss/patients/${patientId}/chat/`, {
+    method: "POST",
+    body: JSON.stringify({ message, history }),
+    token,
+  }) as Promise<{ response: string; history: ChatMessage[] }>;
+}
+
+export interface DifferentialItem {
+  diagnosis: string;
+  icd10Code?: string | null;
+  reasoning?: string;
+}
+
+export interface EncounterSuggestion {
+  encounter_id: string;
+  differential: DifferentialItem[];
+  assessment: string;
+  plan: string;
+  alerts: string;
+  raw: string;
+}
+
+export async function suggestEncounterAssessment(
+  encounterId: string,
+  soap: { subjective?: string; objective?: string; assessment?: string; plan?: string },
+  token?: string | null,
+): Promise<EncounterSuggestion> {
+  return apiFetch(`/cdss/encounters/${encounterId}/suggest/`, {
+    method: "POST",
+    body: JSON.stringify(soap),
+    token,
+  }) as Promise<EncounterSuggestion>;
+}
+
+export interface AcceptedDiagnosis {
+  id: string;
+  patientId: string;
+  encounterId?: string | null;
+  icdCode: string;
+  description: string;
+  diagnosisType: string;
+  status: string;
+  createdAt: string;
+}
+
+export async function acceptAIDiagnosis(
+  encounterId: string,
+  body: {
+    diagnosis: string;
+    icd10Code?: string | null;
+    snomedCode?: string | null;
+    snomedDisplay?: string | null;
+    diagnosisType?: string;
+    status?: string;
+  },
+  token?: string | null,
+): Promise<AcceptedDiagnosis> {
+  return apiFetch(`/cdss/encounters/${encounterId}/accept_diagnosis/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    token,
+  }) as Promise<AcceptedDiagnosis>;
+}
+
+export interface SubstitutionSuggestion {
+  substitute: string;
+  reason: string;
+}
+
+export interface RxAISuggestion {
+  verdict: "safe" | "caution" | "do_not_dispense";
+  verdict_text: string;
+  interactions: string;
+  allergy_risks: string;
+  dose_assessment: string;
+  recommendations: string;
+  substitutions_raw: string;
+  substitution_list: SubstitutionSuggestion[];
+  summary: string;
+  raw: string;
+}
+
+export async function suggestRxVerification(
+  prescriptionId: string,
+  patientId: string,
+  rx: {
+    medication: string;
+    dose: string;
+    route: string;
+    frequency: string;
+    sig?: string;
+    indication?: string;
+  },
+  token?: string | null,
+): Promise<RxAISuggestion> {
+  return apiFetch(`/cdss/prescriptions/${prescriptionId}/ai_suggest/`, {
+    method: "POST",
+    body: JSON.stringify({ patientId, ...rx }),
+    token,
+  }) as Promise<RxAISuggestion>;
+}
+
+export interface LabAISuggestion {
+  overall: "normal" | "abnormal" | "critical";
+  overall_text: string;
+  interpretation: string;
+  clinical_context: string;
+  follow_up: string;
+  summary: string;
+  raw: string;
+}
+
+export interface LabResultInput {
+  testName: string;
+  value: string;
+  unit: string;
+  referenceRange: string;
+  flag: string;
+}
+
+export async function suggestLabInterpretation(
+  panelId: string,
+  patientId: string,
+  panelName: string,
+  results: LabResultInput[],
+  token?: string | null,
+): Promise<LabAISuggestion> {
+  return apiFetch(`/cdss/lab-panels/${panelId}/ai_suggest/`, {
+    method: "POST",
+    body: JSON.stringify({ patientId, panelName, results }),
+    token,
+  }) as Promise<LabAISuggestion>;
 }

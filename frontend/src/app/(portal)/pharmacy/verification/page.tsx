@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { listPharmacyPrescriptions } from "@/features/pharmacy/api";
 import { RxVerificationCard } from "@/features/pharmacy/components/RxVerificationCard";
+import { PharmacyAISuggest } from "@/features/pharmacy/components/PharmacyAISuggest";
 import { PharmacyCDSSPanel } from "@/features/cdss/components/modules/PharmacyCDSSPanel";
 import { useCDSSDataHydration } from "@/features/cdss/hooks/useCDSSDataHydration";
 import { cn } from "@/lib/utils";
@@ -258,6 +259,13 @@ export default function VerificationPage() {
               <PharmacyCDSSPanel
                 patientId={selected.patientId}
                 focusedMedications={[selected.medication, selected.genericName].filter(Boolean)}
+              />
+              <PharmacyAISuggest
+                rx={selected}
+                token={token}
+                onVerify={handleRxUpdated}
+                onHold={handleRxUpdated}
+                onReject={handleRxUpdated}
               />
               <RxVerificationCard
                 rx={selected}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,6 +13,7 @@ import {
   Package,
   Pill,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
   XOctagon,
 } from "lucide-react";
@@ -34,37 +35,51 @@ export default function PharmacyDashboard() {
   const [dashboard, setDashboard] = useState<PharmacyDashboardResponse | null>(null);
   const [pendingVerification, setPendingVerification] = useState<PharmacyPrescription[]>([]);
   const [pendingInterventions, setPendingInterventions] = useState<InterventionRecord[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setRefreshing(true);
+    try {
+      const [data, verificationQueue, interventionQueue] = await Promise.all([
+        getPharmacyDashboard(token ?? undefined),
+        listPharmacyPrescriptions({ status: "verification" }, token ?? undefined),
+        listPharmacyInterventions({ pendingOnly: true }, token ?? undefined),
+      ]);
+      setDashboard(data);
+      // Only keep genuinely pending items — exclude verified/cancelled/rejected
+      const PENDING_STATUSES = new Set(["ordered", "pending-verification"]);
+      setPendingVerification(verificationQueue.filter(rx => PENDING_STATUSES.has(rx.status)));
+      setPendingInterventions(interventionQueue);
+    } catch {
+      setDashboard(null);
+      setPendingVerification([]);
+      setPendingInterventions([]);
+    } finally {
+      if (showSpinner) setRefreshing(false);
+    }
+  }, [token]);
 
   useEffect(() => {
     let cancelled = false;
+    void load().then(() => { if (cancelled) return; });
+    return () => { cancelled = true; };
+  }, [load, refreshKey]);
 
-    void Promise.all([
-      getPharmacyDashboard(token ?? undefined),
-      listPharmacyPrescriptions({ status: "verification" }, token ?? undefined),
-      listPharmacyInterventions({ pendingOnly: true }, token ?? undefined),
-    ])
-      .then(([data, verificationQueue, interventionQueue]) => {
-        if (!cancelled) {
-          setDashboard(data);
-          setPendingVerification(verificationQueue);
-          setPendingInterventions(interventionQueue);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDashboard(null);
-          setPendingVerification([]);
-          setPendingInterventions([]);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
+  function handleRefresh() {
+    setRefreshKey(k => k + 1);
+    void load(true);
+  }
 
   const stats = dashboard?.stats;
-  const severeWarnings = useMemo(() => dashboard?.severeWarnings ?? [], [dashboard]);
+
+  // Only show severe warnings when there are still unverified prescriptions
+  const severeWarnings = useMemo(() => {
+    const all = dashboard?.severeWarnings ?? [];
+    if (pendingVerification.length === 0) return [];
+    return all;
+  }, [dashboard, pendingVerification]);
+
   const lowStockItems = useMemo(() => dashboard?.lowStockItems ?? [], [dashboard]);
 
   return (
@@ -74,9 +89,21 @@ export default function PharmacyDashboard() {
           <h1 className="text-2xl font-bold tracking-tight">Pharmacy Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">Clinical Pharmacy{user?.firstName ? ` - Pharm. ${user.firstName} ${user.lastName ?? ""}`.trim() : ""}</p>
         </div>
-        <Badge variant="outline" className="mt-1 border-teal-500/30 bg-teal-500/5 text-xs text-teal-700">
-          Inpatient + Outpatient
-        </Badge>
+        <div className="flex items-center gap-2 mt-1">
+          <Badge variant="outline" className="border-teal-500/30 bg-teal-500/5 text-xs text-teal-700">
+            Inpatient + Outpatient
+          </Badge>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1.5 text-xs"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RotateCcw className={cn("h-3 w-3", refreshing && "animate-spin")} />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </Button>
+        </div>
       </div>
 
       {severeWarnings.length > 0 && (

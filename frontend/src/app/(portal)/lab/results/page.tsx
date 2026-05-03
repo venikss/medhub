@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FlaskConical, Save } from "lucide-react";
 import { ResultEntryRow } from "@/features/lab/components/ResultEntryRow";
 import { AbnormalHighlight } from "@/features/lab/components/AbnormalHighlight";
+import { LabAISuggest } from "@/features/lab/components/LabAISuggest";
 import { listLabWorklist, submitPanelResults } from "@/features/lab/api";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import type { LabPanel } from "@/types";
@@ -195,6 +196,20 @@ export default function ResultEntryPage() {
                     </div>
                   </CardContent>
                 </Card>
+                <LabAISuggest
+                  panelId={panel.id}
+                  patientId={panel.patientId ?? ""}
+                  patientName={panel.patientName}
+                  panelName={panel.name}
+                  results={(panel.results ?? []).map((r) => ({
+                    testName: r.testName,
+                    value: (entryValues[r.id] ?? r.value ?? "").toString(),
+                    unit: r.unit ?? "",
+                    referenceRange: r.referenceRange ?? "",
+                    flag: r.flag ?? "normal",
+                  }))}
+                  token={token}
+                />
               </AbnormalHighlight>
             );
           })}

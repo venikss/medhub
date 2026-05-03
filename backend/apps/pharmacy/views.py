@@ -10,6 +10,8 @@ Fixed:
   - PharmacyIntervention.save() now passes pharmacist FK (model fixed too)
 """
 
+import logging
+
 from django.utils import timezone
 from django.db.models import Q
 from django.db.models import F
@@ -17,6 +19,8 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 
 from core.audit import write_audit_log, AuditAction, AuditSeverity
 from core.exceptions import NotFoundError, ConflictError, ValidationAppError
@@ -347,6 +351,18 @@ class PharmacyRxVerifyView(APIView):
             request, AuditAction.UPDATE, "PharmacyPrescription", str(rx.id),
             {"action": "verify"}, AuditSeverity.HIGH,
         )
+        # Auto-run KG drug safety check on verification — persists DrugWarning +
+        # CDSSRecommendation records for any KG-detected DDI / allergy / risk-group issues.
+        try:
+            from apps.pharmacy.cdss_service import PharmacyCDSSService
+            med_name = getattr(getattr(rx, "original_prescription", None), "medication", None)
+            safety = PharmacyCDSSService.run_kg_safety_check(str(rx.patient_id), med_name)
+            if safety["total_alerts"] > 0:
+                PharmacyCDSSService.persist_kg_safety_alerts(
+                    rx.patient_id, safety, prescription=rx
+                )
+        except Exception:
+            pass  # KG safety check is non-critical — never block the verify workflow
         return Response(PharmacyPrescriptionSerializer(rx, context={"request": request}).data)
 
 
@@ -918,6 +934,94 @@ class SubstitutionDetailView(APIView):
         return Response(SubstitutionSerializer(sub, context={"request": request}).data)
 
 
+# ---------------------------------------------------------------------------
+# Pharmacy CDSS — KG Safety Check & MedGemma AI Consult
+# ---------------------------------------------------------------------------
+
+class PharmacyKGSafetyView(APIView):
+    """
+    GET /pharmacy/patients/<patient_pk>/kg_safety/
+    Query params: ?drug=<medication_name> (optional — filters to that drug)
+
+    Returns a structured KG-based drug safety report:
+    DDI alerts, allergy cross-reactivity alerts, risk-group alerts.
+    Read-only — does NOT create DrugWarning records.
+    """
+    permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
+
+    def get(self, request, patient_pk):
+        from apps.pharmacy.cdss_service import PharmacyCDSSService
+        drug_name = request.query_params.get("drug")
+        try:
+            safety = PharmacyCDSSService.run_kg_safety_check(str(patient_pk), drug_name)
+        except Exception as exc:
+            logger.error("KG safety check failed for patient %s: %s", patient_pk, exc)
+            return Response(
+                {"error": "KG safety check unavailable", "detail": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response(safety)
 
 
+class PharmacyPatientAIConsultView(APIView):
+    """
+    POST /pharmacy/patients/<patient_pk>/ai_consult/
+    Body: { "prompt": "...", "drug": "..." (optional) }
+
+    Pharmacy-focused MedGemma consult using the patient KG subgraph and
+    the drug safety knowledge graph as grounding context.
+    """
+    permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
+
+    def post(self, request, patient_pk):
+        from apps.pharmacy.cdss_service import PharmacyCDSSService
+        prompt_query = request.data.get("prompt")
+        if not prompt_query:
+            raise ValidationAppError("prompt is required.")
+        drug_name = request.data.get("drug")
+        response_text = PharmacyCDSSService.ai_consult(
+            str(patient_pk), prompt_query, drug_name
+        )
+        return Response({
+            "patientId": str(patient_pk),
+            "drug": drug_name,
+            "query": prompt_query,
+            "response": response_text,
+        })
+
+
+class PharmacyRxAIConsultView(APIView):
+    """
+    POST /pharmacy/prescriptions/<pk>/ai_consult/
+    Body: { "prompt": "..." } (optional — defaults to a safety review prompt)
+
+    AI consult scoped to a specific prescription. The medication name is
+    automatically extracted from the prescription and used as KG context.
+    """
+    permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
+
+    def post(self, request, pk):
+        from apps.pharmacy.cdss_service import PharmacyCDSSService
+        try:
+            rx = PharmacyPrescription.objects.select_related(
+                "patient", "original_prescription"
+            ).get(id=pk)
+        except PharmacyPrescription.DoesNotExist:
+            raise NotFoundError("Pharmacy prescription not found.")
+        prompt_query = request.data.get(
+            "prompt",
+            "Review this prescription for drug interactions, allergy risks, "
+            "dose appropriateness, and suggest any required interventions.",
+        )
+        drug_name = getattr(rx.original_prescription, "medication", None)
+        response_text = PharmacyCDSSService.ai_consult(
+            str(rx.patient_id), prompt_query, drug_name
+        )
+        return Response({
+            "rxId": str(rx.id),
+            "patientId": str(rx.patient_id),
+            "drug": drug_name,
+            "query": prompt_query,
+            "response": response_text,
+        })
 

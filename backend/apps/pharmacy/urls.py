@@ -46,4 +46,9 @@ urlpatterns = [
     # Substitutions
     path("substitutions/", views.SubstitutionListCreateView.as_view(), name="pharmacy-substitution-list-create"),
     path("substitutions/<uuid:pk>/", views.SubstitutionDetailView.as_view(), name="pharmacy-substitution-detail"),
+
+    # Pharmacy CDSS — KG safety check & MedGemma AI consult
+    path("patients/<uuid:patient_pk>/kg_safety/", views.PharmacyKGSafetyView.as_view(), name="pharmacy-kg-safety"),
+    path("patients/<uuid:patient_pk>/ai_consult/", views.PharmacyPatientAIConsultView.as_view(), name="pharmacy-patient-ai-consult"),
+    path("prescriptions/<uuid:pk>/ai_consult/", views.PharmacyRxAIConsultView.as_view(), name="pharmacy-rx-ai-consult"),
 ]
