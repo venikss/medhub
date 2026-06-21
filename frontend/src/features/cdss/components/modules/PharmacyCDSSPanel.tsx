@@ -46,7 +46,6 @@ export function PharmacyCDSSPanel({
   const [expandedId, setExpandedId]       = useState<string | null>(null);
   const [evidenceRec, setEvidenceRec]     = useState<CDSSRecommendation | null>(null);
 
-  // Separate drug-safety recs that mention focused medications
   const drugSafetyTypes = new Set([
     "drug_interaction", "allergy", "dosage_warning", "duplicate_therapy", "contraindication",
   ]);

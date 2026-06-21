@@ -9,7 +9,6 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-
 class AuditAction:
     LOGIN = "login"
     LOGOUT = "logout"
@@ -24,26 +23,21 @@ class AuditAction:
     PASSWORD_RESET = "password_reset"
     CDSS_OVERRIDE = "cdss_override"
 
-
 class AuditSeverity:
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
-    # Backward-compatible alias used across the codebase.
     HIGH = CRITICAL
-
 
 class AuditOutcome:
     SUCCESS = "success"
     FAILURE = "failure"
-
 
 def get_client_ip(request) -> str:
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded_for:
         return x_forwarded_for.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR", "")
-
 
 def write_audit_log(
     request,
@@ -86,5 +80,4 @@ def write_audit_log(
             timestamp=timezone.now(),
         )
     except Exception as exc:
-        # Never let audit logging crash the main request
         logger.error("Audit log write failed: %s", exc)

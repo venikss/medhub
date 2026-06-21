@@ -11,7 +11,6 @@ from unittest.mock import patch
 from rest_framework.test import APIClient
 from rest_framework import status
 
-
 def make_user(role="doctor", email=None, password="Test@1234"):
     from apps.authentication.models import User
     email = email or f"{role}_{id(object())}@test.com"
@@ -21,14 +20,12 @@ def make_user(role="doctor", email=None, password="Test@1234"):
         role=role, status="active",
     )
 
-
 def auth_header(client, user, password="Test@1234"):
     resp = client.post("/api/v1/auth/login/", {"email": user.email, "password": password}, format="json")
     assert resp.status_code == 200
     data = resp.json()
     token = data.get("accessToken") or data.get("access") or data.get("token")
     return {"HTTP_AUTHORIZATION": f"Bearer {token}"}
-
 
 def make_patient():
     from apps.patients.models import Patient
@@ -40,7 +37,6 @@ def make_patient():
         gender="male", phone=f"+20100{uuid.uuid4().hex[:7]}",
         status="active",
     )
-
 
 @pytest.mark.django_db
 class TestNEWS2CDSSTrigger:
@@ -57,18 +53,17 @@ class TestNEWS2CDSSTrigger:
         vitals_payload = {
             "patientId": str(patient.id),
             "temperature": 38.5,
-            "heartRate": 120,        # tachycardia — NEWS2 += 2
-            "respiratoryRate": 26,   # high — NEWS2 += 3
-            "systolicBp": 90,        # low — NEWS2 += 3
-            "oxygenSaturation": 93,  # low — NEWS2 += 2
-            "consciousness": "V",    # AVPU Voice
+            "heartRate": 120,
+            "respiratoryRate": 26,
+            "systolicBp": 90,
+            "oxygenSaturation": 93,
+            "consciousness": "V",
             "newsScore": 10,
         }
         resp = self.client.post(
             f"/api/v1/nurses/patients/{patient.id}/vitals/",
             vitals_payload, format="json", **headers,
         )
-        # Either 201 (created) or 400 if vitals validation differs
         if resp.status_code == status.HTTP_201_CREATED:
             rec_count = CDSSRecommendation.objects.filter(
                 patient=patient,
@@ -96,10 +91,8 @@ class TestNEWS2CDSSTrigger:
             f"/api/v1/nurses/patients/{patient.id}/vitals/",
             vitals_payload, format="json", **headers,
         )
-        # Should not have created new CDSS entries
         new_count = CDSSRecommendation.objects.filter(patient=patient).count()
         assert new_count == initial_count
-
 
 @pytest.mark.django_db
 class TestLabCriticalValueCDSSTrigger:
@@ -114,7 +107,6 @@ class TestLabCriticalValueCDSSTrigger:
         lab_tech = make_user(role="lab_tech", email="lab.cdss@test.com")
         patient = make_patient()
 
-        # Create minimal specimen + panel + result + report
         specimen = Specimen.objects.create(
             patient=patient, type="blood",
             collected_by=lab_tech, status="received",
@@ -148,7 +140,6 @@ class TestLabCriticalValueCDSSTrigger:
             ).count()
             assert after_count > before_count
 
-
 @pytest.mark.django_db
 class TestPharmacyDrugSafetyCDSSTrigger:
     def setup_method(self):
@@ -162,11 +153,9 @@ class TestPharmacyDrugSafetyCDSSTrigger:
 
         pharmacist = make_user(role="pharmacist", email="pharm.cdss@test.com")
         patient = make_patient()
-        # Add allergy to patient
         patient.allergies = ["penicillin"]
         patient.save()
 
-        # Create matching drug warning using the correct model fields
         warning = DrugWarning.objects.create(
             patient=patient,
             type="allergy",
@@ -185,7 +174,6 @@ class TestPharmacyDrugSafetyCDSSTrigger:
             {"patientId": str(patient.id), "medication": "penicillin"},
             format="json", **headers,
         )
-        # If endpoint triggers CDSS on allergy hit
         if resp.status_code == status.HTTP_200_OK and resp.json().get("hasCritical"):
             after_count = CDSSRecommendation.objects.filter(
                 patient=patient, type=CDSSRecommendationType.ALLERGY

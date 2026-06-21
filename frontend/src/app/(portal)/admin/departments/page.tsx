@@ -53,7 +53,6 @@ export default function DepartmentsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // Dialog form state
   interface DeptForm { name: string; code: string; type: DepartmentType; building: string; floorNumber: string; phone: string; description: string }
   const EMPTY_DEPT: DeptForm = { name: "", code: "", type: "clinical", building: "", floorNumber: "", phone: "", description: "" };
   const [formOpen, setFormOpen] = useState(false);
@@ -176,8 +175,6 @@ export default function DepartmentsPage() {
       setFeedback("", err instanceof Error ? err.message : "Couldn't update this department.");
     }
   }
-
-  // (Replaced by Dialog form above)
 
   return (
     <div className="flex gap-6 h-full">

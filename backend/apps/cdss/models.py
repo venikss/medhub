@@ -8,7 +8,6 @@ from django.db import models
 from django.conf import settings
 from core.models import TimeStampedModel
 
-
 class CDSSSourceModule(models.TextChoices):
     DOCTOR = "doctor", "Doctor"
     NURSING = "nursing", "Nursing"
@@ -18,7 +17,6 @@ class CDSSSourceModule(models.TextChoices):
     EMERGENCY = "emergency", "Emergency"
     SURGERY = "surgery", "Surgery"
     SYSTEM = "system", "System"
-
 
 class CDSSRecommendationType(models.TextChoices):
     DRUG_INTERACTION = "drug_interaction", "Drug Interaction"
@@ -48,17 +46,14 @@ class CDSSRecommendationType(models.TextChoices):
     CHECKLIST_GAP = "checklist_gap", "Checklist Gap"
     CARE_PLAN_DEVIATION = "care_plan_deviation", "Care Plan Deviation"
 
-
 class CDSSSeverity(models.TextChoices):
     CRITICAL = "critical", "Critical"
     WARNING = "warning", "Warning"
     INFO = "info", "Info"
 
-
 class CDSSOutputKind(models.TextChoices):
     ALERT = "alert", "Alert"
     RECOMMENDATION = "recommendation", "Recommendation"
-
 
 class CDSSStatus(models.TextChoices):
     ACTIVE = "active", "Active"
@@ -68,19 +63,16 @@ class CDSSStatus(models.TextChoices):
     EXPIRED = "expired", "Expired"
     FOLLOWED = "followed", "Followed"
 
-
 class CDSSConsultRequestStatus(models.TextChoices):
     OPEN = "open", "Open"
     ANSWERED = "answered", "Answered"
     CANCELLED = "cancelled", "Cancelled"
-
 
 class OntologyCodeSystem(models.TextChoices):
     ICD10 = "icd10", "ICD-10"
     SNOMED_CT = "snomed_ct", "SNOMED CT"
     RXNORM = "rxnorm", "RxNorm"
     LOINC = "loinc", "LOINC"
-
 
 class OntologyDomain(models.TextChoices):
     CONDITION = "condition", "Condition"
@@ -89,7 +81,6 @@ class OntologyDomain(models.TextChoices):
     LAB_TEST = "lab_test", "Lab Test"
     PROCEDURE = "procedure", "Procedure"
     ALLERGY = "allergy", "Allergy"
-
 
 class MedicalOntologyConcept(TimeStampedModel):
     """
@@ -126,7 +117,6 @@ class MedicalOntologyConcept(TimeStampedModel):
         if self.display:
             self.normalized_display = self.display.strip().lower()
         super().save(*args, **kwargs)
-
 
 class MedicalOntologyMapping(TimeStampedModel):
     """
@@ -171,7 +161,6 @@ class MedicalOntologyMapping(TimeStampedModel):
             self.normalized_local_display = self.local_display.strip().lower()
         super().save(*args, **kwargs)
 
-
 class CDSSConsultRequest(TimeStampedModel):
     """Doctor-initiated question/request sent to the CDSS engine."""
 
@@ -205,7 +194,6 @@ class CDSSConsultRequest(TimeStampedModel):
     def __str__(self):
         return f"CDSS request for {self.patient.full_name}"
 
-
 class CDSSRecommendation(TimeStampedModel):
     """
     CDSS recommendation / alert aggregate.
@@ -224,7 +212,7 @@ class CDSSRecommendation(TimeStampedModel):
         related_name="generated_recommendations",
     )
     source_module = models.CharField(max_length=30, choices=CDSSSourceModule.choices)
-    target_roles = models.JSONField(default=list)  # List of UserRole strings
+    target_roles = models.JSONField(default=list)
     output_kind = models.CharField(
         max_length=20, choices=CDSSOutputKind.choices, default=CDSSOutputKind.ALERT
     )
@@ -234,23 +222,18 @@ class CDSSRecommendation(TimeStampedModel):
     title = models.CharField(max_length=300)
     summary = models.TextField()
     triggered_by = models.CharField(max_length=200)
-    snomed_code = models.CharField(max_length=20, blank=True, null=True)  # SNOMED CT concept for the recommendation
+    snomed_code = models.CharField(max_length=20, blank=True, null=True)
     snomed_display = models.CharField(max_length=300, blank=True, null=True)
     affected_medications = models.JSONField(default=list)
     suggested_actions = models.JSONField(default=list)
 
-    # Explanation (JSONB)
     explanation = models.JSONField(default=dict)
-    # {summary, reasoning[], clinicalInputs[{label,value,flag?}],
-    #  limitations[], confidence, confidenceScore, modelVersion?}
 
-    # Evidence sources (JSONB array)
     evidence_sources = models.JSONField(default=list)
 
     generated_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True, blank=True)
 
-    # Override tracking
     override_reason = models.TextField(blank=True, null=True)
     override_reason_category = models.CharField(max_length=100, blank=True, null=True)
     overridden_by = models.ForeignKey(
@@ -259,15 +242,13 @@ class CDSSRecommendation(TimeStampedModel):
     )
     overridden_at = models.DateTimeField(null=True, blank=True)
 
-    # Acknowledge tracking
     acknowledged_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="acknowledged_recommendations",
     )
     acknowledged_at = models.DateTimeField(null=True, blank=True)
 
-    # Feedback
-    feedback_rating = models.PositiveIntegerField(null=True, blank=True)  # 1-5
+    feedback_rating = models.PositiveIntegerField(null=True, blank=True)
     feedback_comment = models.TextField(blank=True, null=True)
 
     class Meta:
@@ -284,13 +265,11 @@ class CDSSRecommendation(TimeStampedModel):
     def __str__(self):
         return f"{self.title} - {self.patient.full_name}"
 
-
 class CDSSResponseAction(models.TextChoices):
     OVERRIDE = "override", "Override"
     ACKNOWLEDGE = "acknowledge", "Acknowledge"
     DISMISS = "dismiss", "Dismiss"
     FOLLOW = "follow", "Follow"
-
 
 class CDSSOverrideRecord(TimeStampedModel):
     """Immutable — records every CDSS response action."""

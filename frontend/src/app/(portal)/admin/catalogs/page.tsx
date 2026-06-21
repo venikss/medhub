@@ -63,12 +63,10 @@ export default function CatalogsPage() {
   const [departments, setDepartments] = useState<AdminDepartment[]>([]);
   const [message, setMessage] = useState("");
 
-  // Form dialog
   const [formOpen, setFormOpen] = useState(false);
   const [formTab, setFormTab] = useState<CatalogTab>("lab");
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
-  // generic key-value form; fields differ per tab
   const [editingId, setEditingId] = useState<string | null>(null);
   const [f, setF] = useState<Record<string, string>>({});
 

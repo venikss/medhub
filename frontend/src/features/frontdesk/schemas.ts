@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-// ── Patient Registration ──────────────────────────────────────────────
-
 export const patientRegistrationSchema = z.object({
     firstName: z.string().min(2, "First name is required"),
     lastName: z.string().min(2, "Last name is required"),
@@ -14,12 +12,10 @@ export const patientRegistrationSchema = z.object({
     maritalStatus: z.enum(["single", "married", "divorced", "widowed"]).optional(),
     preferredLanguage: z.string().optional(),
     bloodType: z.string().optional(),
-    allergies: z.string().optional(), // comma-separated
-    // Emergency contact
+    allergies: z.string().optional(),
     emergencyContactName: z.string().min(2, "Emergency contact name required"),
     emergencyContactRelationship: z.string().min(2, "Relationship required"),
     emergencyContactPhone: z.string().min(7, "Emergency contact phone required"),
-    // Insurance (optional)
     insuranceProvider: z.string().optional(),
     insurancePolicyNumber: z.string().optional(),
     insuranceGroupNumber: z.string().optional(),
@@ -30,8 +26,6 @@ export const patientRegistrationSchema = z.object({
 });
 
 export type PatientRegistrationFormData = z.infer<typeof patientRegistrationSchema>;
-
-// ── Admission ─────────────────────────────────────────────────────────
 
 export const admissionSchema = z.object({
     patientId: z.string().min(1, "Patient is required"),
@@ -46,8 +40,6 @@ export const admissionSchema = z.object({
 
 export type AdmissionFormData = z.infer<typeof admissionSchema>;
 
-// ── Transfer ──────────────────────────────────────────────────────────
-
 export const transferSchema = z.object({
     admissionId: z.string().min(1),
     patientId: z.string().min(1),
@@ -59,8 +51,6 @@ export const transferSchema = z.object({
 
 export type TransferFormData = z.infer<typeof transferSchema>;
 
-// ── Discharge ─────────────────────────────────────────────────────────
-
 export const dischargeSchema = z.object({
     admissionId: z.string().min(1),
     patientId: z.string().min(1),
@@ -71,8 +61,6 @@ export const dischargeSchema = z.object({
 });
 
 export type DischargeFormData = z.infer<typeof dischargeSchema>;
-
-// ── Appointment Booking ───────────────────────────────────────────────
 
 export const appointmentBookingSchema = z.object({
     patientId: z.string().min(1, "Patient is required"),

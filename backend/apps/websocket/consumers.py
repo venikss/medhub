@@ -10,7 +10,6 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 logger = logging.getLogger(__name__)
 
-# Maps role string → channel group name (must match core/websockets.py ROLE_GROUP_MAP)
 ROLE_GROUP_MAP = {
     "admin":         "role_admin",
     "doctor":        "role_doctor",
@@ -22,7 +21,6 @@ ROLE_GROUP_MAP = {
     "front_desk":    "role_front_desk",
     "patient":       "role_patient",
 }
-
 
 class HospitalConsumer(AsyncWebsocketConsumer):
     """
@@ -42,18 +40,15 @@ class HospitalConsumer(AsyncWebsocketConsumer):
         self.user = user
         self.joined_groups = []
 
-        # Join role group
         role_group = ROLE_GROUP_MAP.get(getattr(user, "role", None))
         if role_group:
             await self.channel_layer.group_add(role_group, self.channel_name)
             self.joined_groups.append(role_group)
 
-        # Join individual user group
         user_group = f"user_{user.id}"
         await self.channel_layer.group_add(user_group, self.channel_name)
         self.joined_groups.append(user_group)
 
-        # Optionally join patient group
         query_string = self.scope.get("query_string", b"").decode()
         from urllib.parse import parse_qs
         params = parse_qs(query_string)
@@ -93,9 +88,6 @@ class HospitalConsumer(AsyncWebsocketConsumer):
         event = data.get("event")
         if event == "ping":
             await self.send(json.dumps({"event": "pong", "payload": {}}))
-
-    # ─── Message type handlers ─────────────────────────────────────────────
-    # Channel layer dispatches messages by 'type' field (dots replaced by underscores)
 
     async def ws_message(self, message):
         """Relay any group broadcast to the individual WebSocket client."""

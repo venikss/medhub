@@ -10,12 +10,12 @@ import type { DischargeChecklistItem } from "@/types";
 import { cn } from "@/lib/utils";
 
 const categoryEmoji: Record<string, string> = {
-  medical: "🏥",
-  nursing: "🩺",
-  pharmacy: "💊",
-  education: "📖",
-  social: "🤝",
-  transport: "🚗",
+  medical: "",
+  nursing: "",
+  pharmacy: "",
+  education: "",
+  social: "",
+  transport: "",
 };
 
 export default function DischargeChecklistPage() {
@@ -155,7 +155,6 @@ export default function DischargeChecklistPage() {
             <Card key={category} className={cn("border-border/50 shadow-sm", allDone && "opacity-70")}>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold capitalize">
-                  <span>{categoryEmoji[category] || "📋"}</span>
                   {category}
                   {allDone && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
                   <Badge variant="outline" className="ml-auto text-[10px]">

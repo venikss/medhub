@@ -16,7 +16,6 @@ urlpatterns = [
     path("dashboard/", views.PharmacyDashboardView.as_view(), name="pharmacy-dashboard"),
     path("profiles/", views.PharmacyProfilesView.as_view(), name="pharmacy-profiles"),
 
-    # Rx workflow
     path("prescriptions/", views.PharmacyRxListView.as_view(), name="pharmacy-rx-list"),
     path("prescriptions/<uuid:pk>/", views.PharmacyRxDetailView.as_view(), name="pharmacy-rx-detail"),
     path("prescriptions/<uuid:pk>/verify/", views.PharmacyRxVerifyView.as_view(), name="pharmacy-rx-verify"),
@@ -26,28 +25,22 @@ urlpatterns = [
     path("prescriptions/<uuid:pk>/dispense/", views.PharmacyRxDispenseView.as_view(), name="pharmacy-rx-dispense"),
     path("dispense/queue/", views.PharmacyDispenseQueueView.as_view(), name="pharmacy-dispense-queue"),
 
-    # Drug safety check
     path("drug-safety-check/", views.DrugSafetyCheckView.as_view(), name="drug-safety-check"),
 
-    # Formulary
     path("formulary/", views.FormularyListView.as_view(), name="formulary-list"),
     path("formulary/create/", views.FormularyCreateView.as_view(), name="formulary-create"),
     path("formulary/<uuid:pk>/", views.FormularyDetailView.as_view(), name="formulary-detail"),
     path("formulary/<uuid:pk>/stock/", views.FormularyStockView.as_view(), name="formulary-stock"),
 
-    # Interventions
     path("interventions/", views.PharmacyInterventionListCreateView.as_view(), name="pharmacy-intervention-list-create"),
     path("interventions/<uuid:pk>/", views.PharmacyInterventionRespondView.as_view(), name="pharmacy-intervention-detail"),
     path("interventions/<uuid:pk>/respond/", views.PharmacyInterventionRespondView.as_view(), name="pharmacy-intervention-respond"),
 
-    # Refills
     path("refills/", views.RefillListCreateView.as_view(), name="pharmacy-refill-list-create"),
 
-    # Substitutions
     path("substitutions/", views.SubstitutionListCreateView.as_view(), name="pharmacy-substitution-list-create"),
     path("substitutions/<uuid:pk>/", views.SubstitutionDetailView.as_view(), name="pharmacy-substitution-detail"),
 
-    # Pharmacy CDSS — KG safety check & MedGemma AI consult
     path("patients/<uuid:patient_pk>/kg_safety/", views.PharmacyKGSafetyView.as_view(), name="pharmacy-kg-safety"),
     path("patients/<uuid:patient_pk>/ai_consult/", views.PharmacyPatientAIConsultView.as_view(), name="pharmacy-patient-ai-consult"),
     path("prescriptions/<uuid:pk>/ai_consult/", views.PharmacyRxAIConsultView.as_view(), name="pharmacy-rx-ai-consult"),

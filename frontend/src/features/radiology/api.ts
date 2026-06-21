@@ -1,6 +1,7 @@
 ﻿import { apiFetch } from "@/lib/api";
 import type {
   CriticalFinding,
+  DicomSeries,
   ImagingOrder,
   ImagingStudy,
   ModalitySlot,
@@ -24,6 +25,7 @@ export interface RadiologyDashboardResponse {
 }
 
 export interface ImagingOrdersQuery {
+  [key: string]: string | undefined;
   q?: string;
   modality?: string;
   status?: string;
@@ -31,12 +33,14 @@ export interface ImagingOrdersQuery {
 }
 
 export interface ImagingStudiesQuery {
+  [key: string]: string | undefined;
   q?: string;
   modality?: string;
   status?: string;
 }
 
 export interface CriticalFindingsQuery {
+  [key: string]: string | undefined;
   patientId?: string;
   unacknowledged?: string;
 }
@@ -209,5 +213,63 @@ export function createImagingStudy(
     method: "POST",
     token,
     body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Returns the authenticated proxy URL for the raw DICOM file.
+ * Cornerstone3D should NOT use this directly — use DicomViewer which fetches
+ * the bytes with auth and passes a blob URL to the viewer.
+ */
+export function getDicomFileUrl(studyId: string): string {
+  const base =
+    (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "") || "/api/v1";
+  return `${base}/radiology/studies/${studyId}/dicom-file/`;
+}
+
+/** List all saved DICOM series (upload bundles) for a study, newest first. */
+export function listDicomSeries(studyId: string, token?: string | null): Promise<DicomSeries[]> {
+  return apiFetch<DicomSeries[]>(`/radiology/studies/${studyId}/series/`, { token });
+}
+
+export interface DicomAnalysisResult {
+  technique:       string;
+  comparison:      string;
+  findings:        string;
+  impression:      string;
+  recommendations: string;
+  alerts:          string;
+  metadata:        Record<string, string>;
+  aiSource:        string;
+  studyId:         string;
+  seriesId?:       string;
+  raw:             string;
+}
+
+/**
+ * Upload one or more DICOM files (optional) and receive an AI-generated report draft.
+ * When multiple files are provided (a multi-slice series), the backend samples
+ * representative slices from across the full set for vision analysis.
+ * Pass seriesId to re-analyse a previously-uploaded series without re-uploading.
+ * If neither files nor seriesId is given, the backend falls back to the stored pacs_url.
+ */
+export function analyzeDicomStudy(
+  studyId: string,
+  files?: File | File[],
+  seriesId?: string,
+): Promise<DicomAnalysisResult> {
+  if (files) {
+    const formData = new FormData();
+    const fileList = Array.isArray(files) ? files : [files];
+    fileList.forEach((f) => formData.append("file", f));
+    if (seriesId) formData.append("seriesId", seriesId);
+    return apiFetch<DicomAnalysisResult>(`/radiology/studies/${studyId}/dicom-analyze/`, {
+      method: "POST",
+      body: formData,
+    });
+  }
+  return apiFetch<DicomAnalysisResult>(`/radiology/studies/${studyId}/dicom-analyze/`, {
+    method: "POST",
+    body: JSON.stringify(seriesId ? { seriesId } : {}),
   });
 }

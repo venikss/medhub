@@ -49,7 +49,6 @@ class AdmissionTransferAdmin(admin.ModelAdmin):
     autocomplete_fields = ["admission", "from_ward", "from_bed", "to_ward", "to_bed", "approved_by"]
     readonly_fields = ["transferred_at", "created_at", "updated_at"]
 
-
 @admin.register(Consent)
 class ConsentAdmin(admin.ModelAdmin):
     list_display = ["patient", "type", "status", "signed_at"]

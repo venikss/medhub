@@ -9,7 +9,6 @@ from .models import (
     LabTestResult, LabReport, CriticalValue,
 )
 
-
 ANALYZER_QUEUE_STATUS_TO_API = {
     "pending": "queued",
     "in-progress": "running",
@@ -53,14 +52,12 @@ LAB_REPORT_STATUS_FROM_API = {
     "cancelled": "corrected",
 }
 
-
 def accession_status_for_api(instance):
     if instance.specimen.recollect_reason:
         return "recollect-requested"
     if instance.specimen.rejection_reason:
         return "rejected"
     return "accessioned"
-
 
 class SpecimenSerializer(serializers.ModelSerializer):
     class Meta:
@@ -112,7 +109,6 @@ class SpecimenSerializer(serializers.ModelSerializer):
         except Exception:
             return []
 
-
 class AccessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Accession
@@ -138,7 +134,6 @@ class AccessionSerializer(serializers.ModelSerializer):
             "notes": instance.specimen.rejection_reason or instance.specimen.recollect_reason,
             "createdAt": instance.created_at.isoformat(),
         }
-
 
 class AnalyzerQueueSerializer(serializers.ModelSerializer):
     class Meta:
@@ -172,7 +167,6 @@ class AnalyzerQueueSerializer(serializers.ModelSerializer):
             "errorMessage": instance.error_message,
             "createdAt": instance.created_at.isoformat(),
         }
-
 
 class LabPanelSerializer(serializers.ModelSerializer):
     class Meta:
@@ -221,7 +215,6 @@ class LabPanelSerializer(serializers.ModelSerializer):
             "createdAt": instance.created_at.isoformat(),
         }
 
-
 class LabPanelWithResultsSerializer(LabPanelSerializer):
     """Extended serializer that includes results inline."""
 
@@ -230,7 +223,6 @@ class LabPanelWithResultsSerializer(LabPanelSerializer):
         results = instance.results.all()
         data["results"] = LabTestResultSerializer(results, many=True).data
         return data
-
 
 class LabTestResultSerializer(serializers.ModelSerializer):
     testCode = serializers.CharField(source="test_code")
@@ -246,6 +238,16 @@ class LabTestResultSerializer(serializers.ModelSerializer):
         if not is_valid_loinc(code):
             raise serializers.ValidationError("testCode must be a valid LOINC code.")
         return code
+
+    def validate_value(self, value):
+        if value is None:
+            return value
+        value = str(value).strip()
+        if not value:
+            raise serializers.ValidationError("value must not be blank.")
+        if len(value) > 200:
+            raise serializers.ValidationError("value must not exceed 200 characters.")
+        return value
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -281,7 +283,6 @@ class LabTestResultSerializer(serializers.ModelSerializer):
             "verifiedAt": instance.verified_at.isoformat() if instance.verified_at else None,
             "createdAt": instance.created_at.isoformat(),
         }
-
 
 class LabReportSerializer(serializers.ModelSerializer):
     class Meta:
@@ -322,7 +323,6 @@ class LabReportSerializer(serializers.ModelSerializer):
                 for result in results
             )
         )
-        # Find critical notification info from CriticalValue records
         critical_notified_to = None
         critical_notified_at = None
         if has_critical:
@@ -362,7 +362,6 @@ class LabReportSerializer(serializers.ModelSerializer):
             "attachmentUrl": instance.attachment_url,
             "createdAt": instance.created_at.isoformat(),
         }
-
 
 class CriticalValueSerializer(serializers.ModelSerializer):
     class Meta:

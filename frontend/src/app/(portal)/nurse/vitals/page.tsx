@@ -10,7 +10,7 @@ import { VitalsFlowsheet } from "@/features/nurse/components/VitalsFlowsheet";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { listIntakeOutput, listNursePatients, listPainAssessments, listVitals, createVitals, type NurseWardPatient } from "@/features/nurse/api";
 import type { IntakeOutput, PainEntry, VitalEntry } from "@/types";
-import { Heart, Droplets, Activity, ArrowUp, ArrowDown, Plus, Loader2 } from "lucide-react";
+import { Heart, Droplets, Activity, ArrowUp, ArrowDown, Plus, Loader2, BedDouble } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabOptions = ["vitals", "io", "pain"] as const;
@@ -26,6 +26,7 @@ export default function VitalsPage() {
   const [tab, setTab] = useState<FlowTab>("vitals");
   const [showVitalsForm, setShowVitalsForm] = useState(false);
   const [savingVitals, setSavingVitals] = useState(false);
+  const [vitalsError, setVitalsError] = useState<string | null>(null);
   const [vSystolic, setVSystolic] = useState("");
   const [vDiastolic, setVDiastolic] = useState("");
   const [vHR, setVHR] = useState("");
@@ -78,6 +79,7 @@ export default function VitalsPage() {
   async function handleSaveVitals() {
     if (!selectedPatient || !vSystolic || !vDiastolic || !vHR || !vTemp || !vSpO2 || !vRR) return;
     setSavingVitals(true);
+    setVitalsError(null);
     try {
       await createVitals(
         {
@@ -98,6 +100,9 @@ export default function VitalsPage() {
       setVitals(refreshed);
       setShowVitalsForm(false);
       setVSystolic(""); setVDiastolic(""); setVHR(""); setVTemp(""); setVSpO2(""); setVRR(""); setVPain(""); setVGCS(""); setVNotes("");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to save vitals. Check values and try again.";
+      setVitalsError(msg);
     } finally {
       setSavingVitals(false);
     }
@@ -115,22 +120,87 @@ export default function VitalsPage() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {patients.map((patient) => (
-          <button
-            key={patient.id}
-            onClick={() => setSelectedPatient(patient.id)}
-            className={cn(
-              "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-              selectedPatient === patient.id
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border/50 bg-muted/50 text-muted-foreground hover:bg-muted",
-            )}
-          >
-            <span className="font-bold">{patient.roomNumber}</span> {patient.firstName} {patient.lastName}
-          </button>
-        ))}
-      </div>
+      {/* Patient selector — mini cards */}
+      {patients.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {patients.map((patient) => {
+            const isSelected = selectedPatient === patient.id;
+            const acuityColor: Record<string, string> = {
+              critical: "border-red-400 bg-red-50 dark:bg-red-950/30",
+              high: "border-amber-400 bg-amber-50 dark:bg-amber-950/30",
+              medium: "border-sky-400 bg-sky-50 dark:bg-sky-950/30",
+              low: "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/20",
+            };
+            const acuityBadge: Record<string, string> = {
+              critical: "bg-red-500 text-white",
+              high: "bg-amber-500 text-white",
+              medium: "bg-sky-500 text-white",
+              low: "bg-emerald-500 text-white",
+            };
+            const latestVital = vitals
+              .filter((v) => v.patientId === patient.id)
+              .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
+
+            return (
+              <button
+                key={patient.id}
+                onClick={() => { setSelectedPatient(patient.id); setShowVitalsForm(false); }}
+                className={cn(
+                  "flex flex-col gap-2 rounded-xl border-2 p-3 text-left transition-all",
+                  isSelected
+                    ? "border-primary bg-primary/5 shadow-md ring-1 ring-primary/30"
+                    : (patient.acuity ? acuityColor[patient.acuity] : "border-border/50 bg-card hover:border-primary/30 hover:shadow-sm"),
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={cn("flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold", isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                      {patient.roomNumber ?? "?"}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold leading-tight">{patient.firstName} {patient.lastName}</p>
+                      <p className="font-mono text-[10px] text-muted-foreground">{patient.mrn}</p>
+                    </div>
+                  </div>
+                  {patient.acuity && (
+                    <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium capitalize", acuityBadge[patient.acuity] ?? "bg-slate-400 text-white")}>
+                      {patient.acuity}
+                    </span>
+                  )}
+                </div>
+
+                {/* Latest vitals summary */}
+                {latestVital ? (
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <Heart className="h-3 w-3 shrink-0 text-red-400" />
+                    <span>{latestVital.systolic}/{latestVital.diastolic} mmHg</span>
+                    <span>·</span>
+                    <span>HR {latestVital.heartRate}</span>
+                    {latestVital.news2Score != null && (
+                      <span className={cn("ml-auto rounded px-1 py-0.5 font-medium", latestVital.news2Score >= 7 ? "bg-red-100 text-red-700" : latestVital.news2Score >= 5 ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground")}>
+                        NEWS2 {latestVital.news2Score}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[10px] italic text-muted-foreground/60">No vitals recorded yet</p>
+                )}
+
+                {patient.diagnosis && (
+                  <p className="line-clamp-1 text-[10px] text-muted-foreground">{patient.diagnosis}</p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <Card className="border-border/50">
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-muted-foreground">
+            <BedDouble className="h-10 w-10 text-muted-foreground/20" />
+            <p className="text-sm">No patients currently assigned to your ward</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Vitals Input Form */}
       {showVitalsForm && selectedPatient && (
@@ -158,8 +228,8 @@ export default function VitalsPage() {
                 <Input type="number" value={vHR} onChange={(e) => setVHR(e.target.value)} placeholder="72" className="text-sm" />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Temperature (°F)</label>
-                <Input type="number" step="0.1" value={vTemp} onChange={(e) => setVTemp(e.target.value)} placeholder="98.6" className="text-sm" />
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Temperature (°C)</label>
+                <Input type="number" step="0.1" value={vTemp} onChange={(e) => setVTemp(e.target.value)} placeholder="37.0" className="text-sm" />
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">SpO2 (%)</label>
@@ -183,7 +253,10 @@ export default function VitalsPage() {
               <Textarea value={vNotes} onChange={(e) => setVNotes(e.target.value)} placeholder="Additional observations..." rows={2} className="resize-none text-sm" />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowVitalsForm(false)}>Cancel</Button>
+              {vitalsError && (
+                <p className="mr-auto self-center text-xs text-destructive">{vitalsError}</p>
+              )}
+              <Button variant="outline" size="sm" onClick={() => { setShowVitalsForm(false); setVitalsError(null); }}>Cancel</Button>
               <Button
                 size="sm"
                 disabled={savingVitals || !vSystolic || !vDiastolic || !vHR || !vTemp || !vSpO2 || !vRR}

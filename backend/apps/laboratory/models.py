@@ -8,7 +8,6 @@ from django.conf import settings
 from core.models import TimeStampedModel
 from core.utils import generate_barcode, generate_accession_number
 
-
 class SpecimenType(models.TextChoices):
     BLOOD = "blood", "Blood"
     SERUM = "serum", "Serum"
@@ -20,7 +19,6 @@ class SpecimenType(models.TextChoices):
     TISSUE = "tissue", "Tissue"
     OTHER = "other", "Other"
 
-
 class SpecimenStatus(models.TextChoices):
     ORDERED = "ordered", "Ordered"
     COLLECTED = "collected", "Collected"
@@ -30,8 +28,7 @@ class SpecimenStatus(models.TextChoices):
     ANALYZED = "analyzed", "Analyzed"
     RESULTED = "resulted", "Resulted"
     REJECTED = "rejected", "Rejected"
-    RECOLLECT = "recollect", "Recollect Required"  # FIXED: added for recollect workflow
-
+    RECOLLECT = "recollect", "Recollect Required"
 
 class SpecimenCondition(models.TextChoices):
     ACCEPTABLE = "acceptable", "Acceptable"
@@ -41,7 +38,6 @@ class SpecimenCondition(models.TextChoices):
     CLOTTED = "clotted", "Clotted"
     INSUFFICIENT = "insufficient", "Insufficient"
     WRONG_TUBE = "wrong-tube", "Wrong Tube"
-
 
 class Specimen(TimeStampedModel):
     patient = models.ForeignKey(
@@ -69,7 +65,7 @@ class Specimen(TimeStampedModel):
         related_name="received_specimens",
     )
     rejection_reason = models.TextField(blank=True, null=True)
-    recollect_reason = models.TextField(blank=True, null=True)  # FIXED: for recollect endpoint
+    recollect_reason = models.TextField(blank=True, null=True)
 
     class Meta:
         db_table = "specimens"
@@ -88,7 +84,6 @@ class Specimen(TimeStampedModel):
 
     def __str__(self):
         return f"{self.type} specimen - {self.patient.full_name}"
-
 
 class Accession(TimeStampedModel):
     accession_number = models.CharField(max_length=30, unique=True, db_index=True)
@@ -114,13 +109,11 @@ class Accession(TimeStampedModel):
     def __str__(self):
         return f"{self.accession_number} - {self.specimen.patient.full_name}"
 
-
 class AnalyzerQueueStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     IN_PROGRESS = "in-progress", "In Progress"
     COMPLETED = "completed", "Completed"
     ERROR = "error", "Error"
-
 
 class AnalyzerQueue(TimeStampedModel):
     specimen = models.ForeignKey(Specimen, on_delete=models.CASCADE, related_name="analyzer_queue_entries")
@@ -140,14 +133,12 @@ class AnalyzerQueue(TimeStampedModel):
     def __str__(self):
         return f"{self.instrument} - {self.specimen.patient.full_name}"
 
-
 class LabResultFlag(models.TextChoices):
     NORMAL = "normal", "Normal"
     HIGH = "high", "High"
     LOW = "low", "Low"
     CRITICAL_HIGH = "critical-high", "Critical High"
     CRITICAL_LOW = "critical-low", "Critical Low"
-
 
 class LabResultStatus(models.TextChoices):
     PENDING = "pending", "Pending"
@@ -157,14 +148,12 @@ class LabResultStatus(models.TextChoices):
     CORRECTED = "corrected", "Corrected"
     CANCELLED = "cancelled", "Cancelled"
 
-
 class LabPanelStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     IN_PROGRESS = "in-progress", "In Progress"
     RESULTED = "resulted", "Resulted"
     VERIFIED = "verified", "Verified"
     RELEASED = "released", "Released"
-
 
 class LabPanel(TimeStampedModel):
     patient = models.ForeignKey(
@@ -195,17 +184,16 @@ class LabPanel(TimeStampedModel):
     def __str__(self):
         return f"{self.name} - {self.patient.full_name}"
 
-
 class LabTestResult(TimeStampedModel):
     panel = models.ForeignKey(LabPanel, on_delete=models.CASCADE, related_name="results")
     specimen = models.ForeignKey(Specimen, on_delete=models.SET_NULL, null=True, blank=True)
-    test_code = models.CharField(max_length=50)   # LOINC code
+    test_code = models.CharField(max_length=50)
     test_name = models.CharField(max_length=200)
     value = models.CharField(max_length=200)
     unit = models.CharField(max_length=50, blank=True)
     reference_range = models.CharField(max_length=100, blank=True)
     flag = models.CharField(max_length=20, choices=LabResultFlag.choices, blank=True, null=True)
-    is_critical = models.BooleanField(default=False)  # FIXED: explicit boolean for critical check
+    is_critical = models.BooleanField(default=False)
     previous_value = models.CharField(max_length=200, blank=True, null=True)
     delta = models.CharField(max_length=100, blank=True, null=True)
     delta_flag = models.CharField(max_length=20, blank=True, null=True)
@@ -229,14 +217,12 @@ class LabTestResult(TimeStampedModel):
         ]
 
     def save(self, *args, **kwargs):
-        # Auto-set is_critical based on flag
         if self.flag in (LabResultFlag.CRITICAL_HIGH, LabResultFlag.CRITICAL_LOW):
             self.is_critical = True
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.test_name} - {self.panel.patient.full_name}"
-
 
 class LabReportStatus(models.TextChoices):
     PENDING = "pending", "Pending"
@@ -245,7 +231,6 @@ class LabReportStatus(models.TextChoices):
     RELEASED = "released", "Released"
     CORRECTED = "corrected", "Corrected"
     AMENDED = "amended", "Amended"
-
 
 class LabReport(TimeStampedModel):
     patient = models.ForeignKey(
@@ -274,12 +259,10 @@ class LabReport(TimeStampedModel):
     def __str__(self):
         return f"Lab report - {self.patient.full_name}"
 
-
 class CriticalValueStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     NOTIFIED = "notified", "Notified"
     ACKNOWLEDGED = "acknowledged", "Acknowledged"
-
 
 class CriticalValue(TimeStampedModel):
     result = models.OneToOneField(

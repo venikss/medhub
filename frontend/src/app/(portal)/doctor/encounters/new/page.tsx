@@ -4,13 +4,15 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EncounterNoteEditor, type EncounterNoteEditorHandle } from "@/features/doctor/components/EncounterNoteEditor";
 import { EncounterAISuggest } from "@/features/doctor/components/EncounterAISuggest";
 import { PatientBanner } from "@/features/doctor/components/PatientBanner";
 import { CDSSSidebar } from "@/features/doctor/components/CDSSSidebar";
-import { FileText, Calendar, Activity, Thermometer, Heart, Wind, Gauge, ChevronDown, ChevronUp } from "lucide-react";
+import { FileText, Calendar, Activity, Thermometer, Heart, Wind, Gauge, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
-import { createDoctorEncounter, listAdmissions, listDoctorEncounters, signDoctorEncounter, updateDoctorEncounter, type DoctorAdmission } from "@/features/doctor/api";
+import { createDoctorDiagnosis, createDoctorEncounter, deleteDoctorEncounter, listAdmissions, listDoctorEncounters, signDoctorEncounter, updateDoctorEncounter, type DiagnosisCatalogOption, type DoctorAdmission } from "@/features/doctor/api";
+import { DiagnosisCatalogCombobox } from "@/features/doctor/components/DiagnosisCatalogCombobox";
 import { getPatientCDSSSummary } from "@/features/cdss/api";
 import { getPatient } from "@/features/frontdesk/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,7 +36,9 @@ function EncounterPageInner() {
     const [latestVitals, setLatestVitals] = useState<Record<string, number | string | boolean | null> | null>(null);
     const [expandedEncounterId, setExpandedEncounterId] = useState<string | null>(null);
     const editorRef = useRef<EncounterNoteEditorHandle>(null);
-    // Load admitted patients for the selector when no URL patientId
+    const [selectedDiagnosis, setSelectedDiagnosis] = useState<DiagnosisCatalogOption | null>(null);
+    const [savingDiagnosis, setSavingDiagnosis] = useState(false);
+    const [diagnosisMessage, setDiagnosisMessage] = useState<string | null>(null);
     useEffect(() => {
         if (urlPatientId) return;
         if (!user?.id) return;
@@ -86,7 +90,6 @@ function EncounterPageInner() {
                         source: item.sourceModule ?? "system",
                     })),
                 );
-                // Fetch latest vitals for the encounter sidebar
                 try {
                     const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
                     const vRes = await fetch(`${baseUrl}/nurses/patients/${resolvedPatient.id}/vitals/latest/`, {
@@ -131,7 +134,6 @@ function EncounterPageInner() {
     async function handleSave(data: Pick<Encounter, "subjective" | "objective" | "assessment" | "plan">) {
         if (!patient) return;
         if (currentEncounterId) {
-            // Update existing draft in-place
             const updated = await updateDoctorEncounter(currentEncounterId, data, token ?? undefined);
             setRecentEncounters((prev) => prev.map((e) => e.id === currentEncounterId ? updated : e));
         } else {
@@ -153,10 +155,8 @@ function EncounterPageInner() {
         let encounterId = currentEncounterId;
 
         if (encounterId) {
-            // Update existing draft with latest SOAP, then sign it
             await updateDoctorEncounter(encounterId, data, token ?? undefined);
         } else {
-            // No draft yet — create one, then sign it
             const created = await createDoctorEncounter(
                 {
                     patientId: patient.id,
@@ -170,13 +170,51 @@ function EncounterPageInner() {
         }
 
         const signed = await signDoctorEncounter(encounterId, token ?? undefined);
-        // Replace the draft with the signed version (no duplicate)
         setRecentEncounters((prev) =>
             prev.some((e) => e.id === encounterId)
                 ? prev.map((e) => e.id === encounterId ? signed : e)
                 : [signed, ...prev]
         );
-        setCurrentEncounterId(null); // Reset — encounter is now locked
+        setCurrentEncounterId(null);
+    }
+
+    async function handleDeleteDraft(encounterId: string) {
+        if (!confirm("Delete this draft encounter? This cannot be undone.")) return;
+        await deleteDoctorEncounter(encounterId, token ?? undefined);
+        setRecentEncounters((prev) => prev.filter((e) => e.id !== encounterId));
+        if (currentEncounterId === encounterId) {
+            setCurrentEncounterId(null);
+            editorRef.current?.load({ subjective: "", objective: "", assessment: "", plan: "" });
+        }
+    }
+
+    async function handleAddDiagnosis() {
+        if (!patient || !selectedDiagnosis?.icd10Code) {
+            setDiagnosisMessage("Select a diagnosis with an ICD-10 code first.");
+            return;
+        }
+        setSavingDiagnosis(true);
+        setDiagnosisMessage(null);
+        try {
+            await createDoctorDiagnosis(
+                {
+                    patientId: patient.id,
+                    icdCode: selectedDiagnosis.icd10Code,
+                    description: selectedDiagnosis.label,
+                    diagnosisType: "primary",
+                    status: "active",
+                    snomedCode: selectedDiagnosis.snomedCode ?? undefined,
+                    snomedDisplay: selectedDiagnosis.snomedDisplay ?? selectedDiagnosis.label,
+                },
+                token ?? undefined,
+            );
+            setSelectedDiagnosis(null);
+            setDiagnosisMessage("Diagnosis added successfully.");
+        } catch (error) {
+            setDiagnosisMessage(error instanceof Error ? error.message : "Failed to add diagnosis.");
+        } finally {
+            setSavingDiagnosis(false);
+        }
     }
 
     if (isLoading) {
@@ -239,6 +277,32 @@ function EncounterPageInner() {
                         onSign={handleSign}
                         onFormChange={setLiveForm}
                     />
+
+                    <Card className="border-border/50 shadow-sm overflow-visible">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-semibold">Manual Diagnosis</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Ontology Catalog</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Search coded diagnoses with ICD-10 and SNOMED codes and add them to this patient&apos;s record.
+                                </p>
+                                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                                    <DiagnosisCatalogCombobox
+                                        value={selectedDiagnosis}
+                                        onSelect={setSelectedDiagnosis}
+                                        onClear={() => setSelectedDiagnosis(null)}
+                                        className="flex-1"
+                                    />
+                                    <Button size="sm" onClick={() => void handleAddDiagnosis()} disabled={savingDiagnosis || !selectedDiagnosis}>
+                                        {savingDiagnosis ? "Adding…" : "Add Diagnosis"}
+                                    </Button>
+                                </div>
+                                {diagnosisMessage && <p className="mt-2 text-xs text-muted-foreground">{diagnosisMessage}</p>}
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     {recentEncounters.length > 0 && (
                         <Card className="border-border/50 shadow-sm">
@@ -304,6 +368,37 @@ function EncounterPageInner() {
                                                             <div>
                                                                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Plan</p>
                                                                 <p className="text-xs leading-relaxed whitespace-pre-wrap">{encounter.plan}</p>
+                                                            </div>
+                                                        )}
+                                                        {!isSigned && (
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="default"
+                                                                    className="text-xs gap-1.5"
+                                                                    onClick={() => {
+                                                                        setCurrentEncounterId(encounter.id);
+                                                                        editorRef.current?.load({
+                                                                            subjective: encounter.subjective ?? "",
+                                                                            objective: encounter.objective ?? "",
+                                                                            assessment: encounter.assessment ?? "",
+                                                                            plan: encounter.plan ?? "",
+                                                                        });
+                                                                        setExpandedEncounterId(null);
+                                                                        window.scrollTo({ top: 0, behavior: "smooth" });
+                                                                    }}
+                                                                >
+                                                                    Resume Draft
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="text-xs gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                                                                    onClick={() => void handleDeleteDraft(encounter.id)}
+                                                                >
+                                                                    <Trash2 className="h-3 w-3" />
+                                                                    Delete
+                                                                </Button>
                                                             </div>
                                                         )}
                                                         {isSigned && (

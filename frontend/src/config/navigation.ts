@@ -114,15 +114,6 @@ export const roleNavigation: Record<UserRole, NavSection[]> = {
         },
     ],
 
-    [UserRole.PATIENT]: [
-        {
-            label: "Overview",
-            items: [
-                { title: "Dashboard", href: "/patient", icon: LayoutDashboard },
-            ],
-        },
-    ],
-
     [UserRole.NURSE]: [
         {
             label: "Overview",
@@ -303,4 +294,6 @@ export const roleNavigation: Record<UserRole, NavSection[]> = {
             ],
         },
     ],
+
+    [UserRole.PATIENT]: [],
 };

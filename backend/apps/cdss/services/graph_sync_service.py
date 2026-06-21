@@ -8,6 +8,7 @@ from apps.cdss.graph_models import (
     DiseaseNode,
     EncounterNode,
     ICD10ConceptNode,
+    ImagingOrderNode,
     LOINCConceptNode,
     LabResultNode,
     MedicationNode,
@@ -15,9 +16,9 @@ from apps.cdss.graph_models import (
     RadiologyReportNode,
     RxNormConceptNode,
     SNOMEDConceptNode,
+    VitalsNode,
 )
 from apps.cdss.services.ontology_service import OntologyService
-
 
 class GraphSyncService:
     @staticmethod
@@ -83,8 +84,12 @@ class GraphSyncService:
             {"uid": str(patient.id)},
         )
 
+        raw_allergies = patient.allergies or []
+        if isinstance(raw_allergies, str):
+            raw_allergies = [s.strip() for s in raw_allergies.split(",") if s.strip()]
+
         seen_entries = set()
-        for entry in patient.allergies or []:
+        for entry in raw_allergies:
             normalized = cls._normalize_allergy_entry(entry)
             substance = normalized["substance"]
             if not substance:
@@ -102,6 +107,20 @@ class GraphSyncService:
             if not allergy_node:
                 allergy_node = AllergyNode(name=substance).save()
 
+            db.cypher_query(
+                """
+                MATCH (a:AllergyNode {name: $name})
+                MATCH (g:AllergyCrossReactivityGroupNode)
+                WHERE g.trigger_substances IS NOT NULL
+                  AND any(t IN split(g.trigger_substances, '|') WHERE
+                      toLower($name) = toLower(t) OR
+                      toLower($name) CONTAINS toLower(t) OR
+                      toLower(t) CONTAINS toLower($name))
+                MERGE (a)-[:BELONGS_TO_ALLERGEN_GROUP]->(g)
+                """,
+                {"name": substance},
+            )
+
             patient_node.allergies.connect(
                 allergy_node,
                 {
@@ -111,9 +130,78 @@ class GraphSyncService:
                 },
             )
 
+    @staticmethod
+    def _populate_vitals_node(node, vitals):
+        """Write all scalar fields from a Vitals ORM instance onto a VitalsNode."""
+        node.systolic = vitals.systolic
+        node.diastolic = vitals.diastolic
+        node.heart_rate = vitals.heart_rate
+        node.spo2 = vitals.spo2
+        node.temperature = float(vitals.temperature) if vitals.temperature is not None else None
+        node.respiratory_rate = vitals.respiratory_rate
+        node.pain_score = vitals.pain_score
+        node.gcs = vitals.gcs
+        node.news2_score = vitals.news2_score
+        node.recorded_at = vitals.recorded_at
+        node.is_admission_vitals = bool(vitals.is_admission_vitals)
+        node.notes = (vitals.notes or "")[:500]
+        node.save()
+        return node
+
+    @classmethod
+    def _connect_vitals(cls, patient_node, vitals_node, vitals):
+        """Connect patient → vitals node if not already connected."""
+        if not patient_node.vitals.is_connected(vitals_node):
+            patient_node.vitals.connect(
+                vitals_node,
+                {
+                    "recorded_at": vitals.recorded_at,
+                    "is_admission_vitals": bool(vitals.is_admission_vitals),
+                },
+            )
+
+    @classmethod
+    def sync_vitals(cls, vitals):
+        """Maintain at most 3 VitalsNodes per patient in Neo4j:
+
+        1. ``admission_{patient_id}``  — baseline; written once on the first
+           admission vitals record, never overwritten afterwards.
+        2. ``latest_{patient_id}``     — always updated in-place with the most
+           recent reading so the CDSS has current values without graph growth.
+        3. ``critical_{vitals_id}``    — one node per critical episode
+           (NEWS2 ≥ 5); preserved indefinitely for trend analysis.
+
+        Full time-series history is stored in PostgreSQL and displayed via the
+        VitalsFlowsheet — Neo4j only needs semantically meaningful snapshots.
+        """
+        patient_node = cls.ensure_patient_node(vitals.patient)
+        patient_uid = str(vitals.patient_id)
+        news2 = vitals.news2_score or 0
+
+        if vitals.is_admission_vitals:
+            admission_uid = f"admission_{patient_uid}"
+            existing = VitalsNode.nodes.get_or_none(vitals_uid=admission_uid)
+            if not existing:
+                node = VitalsNode(vitals_uid=admission_uid)
+                cls._populate_vitals_node(node, vitals)
+                cls._connect_vitals(patient_node, node, vitals)
+
+        latest_uid = f"latest_{patient_uid}"
+        latest_node = VitalsNode.nodes.get_or_none(vitals_uid=latest_uid)
+        if not latest_node:
+            latest_node = VitalsNode(vitals_uid=latest_uid)
+        cls._populate_vitals_node(latest_node, vitals)
+        cls._connect_vitals(patient_node, latest_node, vitals)
+
+        if news2 >= 5:
+            critical_uid = f"critical_{vitals.id}"
+            if not VitalsNode.nodes.get_or_none(vitals_uid=critical_uid):
+                critical_node = VitalsNode(vitals_uid=critical_uid)
+                cls._populate_vitals_node(critical_node, vitals)
+                cls._connect_vitals(patient_node, critical_node, vitals)
+
     @classmethod
     def sync_encounter(cls, encounter):
-        """Sync a doctor Encounter (SOAP note) to Neo4j EncounterNode."""
         patient_node = cls.ensure_patient_node(encounter.patient)
 
         encounter_uid = str(encounter.id)
@@ -207,6 +295,18 @@ class GraphSyncService:
             patient_node.diagnoses.connect(
                 disease_node,
                 {"date": timezone.now(), "status": diagnosis.status},
+            )
+        else:
+            db.cypher_query(
+                """
+                MATCH (p:PatientNode {uid: $uid})-[r:DIAGNOSED_WITH]->(d:DiseaseNode {name: $name})
+                SET r.status = $status
+                """,
+                {
+                    "uid": str(diagnosis.patient_id),
+                    "name": disease_name,
+                    "status": diagnosis.status,
+                },
             )
 
     @classmethod
@@ -317,6 +417,49 @@ class GraphSyncService:
                 "status": result.status,
                 "panel_name": result.panel.name,
                 "flag": result.flag or "",
+            },
+        )
+
+    @classmethod
+    def sync_imaging_order(cls, order):
+        """Mirror an ImagingOrder to Neo4j so the CDSS has awareness of in-flight
+        studies (ordered but not yet reported). Updated on every status change.
+        Duplicate-order detection and appropriateness context both benefit."""
+        patient_node = cls.sync_patient_profile(order.patient)
+
+        order_node = ImagingOrderNode.nodes.get_or_none(order_uid=str(order.id))
+        if not order_node:
+            order_node = ImagingOrderNode(order_uid=str(order.id))
+
+        order_node.modality = order.modality or ""
+        order_node.exam_code = order.exam_code or ""
+        order_node.exam_name = order.exam_name or ""
+        order_node.body_part = order.body_part or ""
+        order_node.indication = (order.indication or "")[:500]
+        order_node.clinical_history = (order.clinical_history or "")[:500]
+        order_node.contrast_required = "true" if order.contrast_required else "false"
+        order_node.priority = order.priority or "routine"
+        order_node.status = order.status or ""
+        order_node.accession_number = order.accession_number or ""
+        order_node.save()
+
+        ordered_at = order.created_at or timezone.now()
+        db.cypher_query(
+            """
+            MATCH (p:PatientNode {uid: $uid}), (o:ImagingOrderNode {order_uid: $order_uid})
+            MERGE (p)-[r:HAS_IMAGING_ORDER {order_uid: $order_uid}]->(o)
+            SET r.ordered_at  = datetime($ordered_at),
+                r.status      = $status,
+                r.modality    = $modality,
+                r.priority    = $priority
+            """,
+            {
+                "uid": str(order.patient_id),
+                "order_uid": str(order.id),
+                "ordered_at": ordered_at.isoformat(),
+                "status": order.status or "",
+                "modality": order.modality or "",
+                "priority": order.priority or "routine",
             },
         )
 

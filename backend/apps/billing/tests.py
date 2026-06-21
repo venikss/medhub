@@ -9,7 +9,6 @@ from apps.patients.models import Gender, Patient
 
 from .models import BillingInvoiceStatus, ClaimStatus, Invoice, Claim, Payment, Denial, DenialStatus
 
-
 class BillingDashboardSmokeTest(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(

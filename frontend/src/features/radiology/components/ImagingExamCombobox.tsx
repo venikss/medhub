@@ -18,8 +18,6 @@ import { Input } from "@/components/ui/input";
 import type { ImagingModality } from "@/types";
 import { cn } from "@/lib/utils";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface ImagingExam {
   name: string;
   modality: ImagingModality;
@@ -48,10 +46,7 @@ interface ImagingExamComboboxProps {
   disabled?: boolean;
 }
 
-// ─── Catalog ──────────────────────────────────────────────────────────────────
-
 const IMAGING_CATALOG: ImagingExam[] = [
-  // ── Plain X-Ray
   { name: "Chest X-Ray (PA & Lateral)", modality: "XR", body: "Thorax", contrast: false },
   { name: "Chest X-Ray (AP Portable)", modality: "XR", body: "Thorax", contrast: false },
   { name: "Abdominal X-Ray (KUB)", modality: "XR", body: "Abdomen", contrast: false },
@@ -69,7 +64,6 @@ const IMAGING_CATALOG: ImagingExam[] = [
   { name: "Tibia / Fibula X-Ray", modality: "XR", body: "Tibia/Fibula", contrast: false },
   { name: "Ankle X-Ray", modality: "XR", body: "Ankle", contrast: false },
   { name: "Foot X-Ray", modality: "XR", body: "Foot", contrast: false },
-  // ── CT
   { name: "CT Head without Contrast", modality: "CT", body: "Head", contrast: false },
   { name: "CT Head with Contrast", modality: "CT", body: "Head", contrast: true },
   { name: "CT Head with/without Contrast", modality: "CT", body: "Head", contrast: true },
@@ -88,7 +82,6 @@ const IMAGING_CATALOG: ImagingExam[] = [
   { name: "CT Spine – Cervical", modality: "CT", body: "Cervical Spine", contrast: false },
   { name: "CT Spine – Thoracic", modality: "CT", body: "Thoracic Spine", contrast: false },
   { name: "CT Spine – Lumbar", modality: "CT", body: "Lumbar Spine", contrast: false },
-  // ── MRI
   { name: "MRI Brain without Gadolinium", modality: "MRI", body: "Brain", contrast: false },
   { name: "MRI Brain with Gadolinium", modality: "MRI", body: "Brain", contrast: true },
   { name: "MRI Brain with/without Gadolinium", modality: "MRI", body: "Brain", contrast: true },
@@ -106,7 +99,6 @@ const IMAGING_CATALOG: ImagingExam[] = [
   { name: "MRI Wrist", modality: "MRI", body: "Wrist", contrast: false },
   { name: "MRI Breast (Bilateral)", modality: "MRI", body: "Bilateral Breast", contrast: true },
   { name: "MRI Cardiac", modality: "MRI", body: "Heart", contrast: true },
-  // ── Ultrasound
   { name: "Ultrasound Abdomen (Complete)", modality: "US", body: "Abdomen", contrast: false },
   { name: "Ultrasound Pelvis (Transabdominal)", modality: "US", body: "Pelvis", contrast: false },
   { name: "Ultrasound Pelvis (Transvaginal)", modality: "US", body: "Pelvis", contrast: false },
@@ -120,7 +112,6 @@ const IMAGING_CATALOG: ImagingExam[] = [
   { name: "Echocardiogram – Transesophageal (TEE)", modality: "US", body: "Heart", contrast: false },
   { name: "Ultrasound-Guided Biopsy", modality: "US", body: "Variable", contrast: false },
   { name: "Ultrasound Scrotal", modality: "US", body: "Scrotum/Testes", contrast: false },
-  // ── Nuclear Medicine
   { name: "Bone Scan (Tc-99m)", modality: "NM", body: "Whole Body", contrast: false },
   { name: "Ventilation/Perfusion Scan (V/Q)", modality: "NM", body: "Lungs", contrast: false },
   { name: "Thyroid Scan (Tc-99m)", modality: "NM", body: "Thyroid", contrast: false },
@@ -129,26 +120,20 @@ const IMAGING_CATALOG: ImagingExam[] = [
   { name: "Renal Scan (MAG-3 Diuretic)", modality: "NM", body: "Kidneys", contrast: false },
   { name: "Myocardial Perfusion Scan (SPECT)", modality: "NM", body: "Heart", contrast: false },
   { name: "Sentinel Node Lymphoscintigraphy", modality: "NM", body: "Variable", contrast: false },
-  // ── PET
   { name: "PET-CT Whole Body (FDG)", modality: "PET", body: "Whole Body", contrast: false },
   { name: "PET-CT Brain (FDG)", modality: "PET", body: "Brain", contrast: false },
   { name: "PET-CT Cardiac Viability", modality: "PET", body: "Heart", contrast: false },
-  // ── DEXA
   { name: "DEXA Bone Density (Spine & Hip)", modality: "DEXA", body: "Spine / Hip", contrast: false },
   { name: "DEXA Body Composition", modality: "DEXA", body: "Whole Body", contrast: false },
-  // ── Mammography
   { name: "Mammogram – Screening (Bilateral)", modality: "MAMMO", body: "Bilateral Breast", contrast: false },
   { name: "Mammogram – Diagnostic", modality: "MAMMO", body: "Breast", contrast: false },
   { name: "Breast Tomosynthesis 3D (Bilateral)", modality: "MAMMO", body: "Bilateral Breast", contrast: false },
-  // ── Fluoroscopy
   { name: "Barium Swallow (Esophagram)", modality: "FLUORO", body: "Esophagus", contrast: true },
   { name: "Upper GI Series", modality: "FLUORO", body: "Upper GI", contrast: true },
   { name: "Small Bowel Follow-Through", modality: "FLUORO", body: "Small Bowel", contrast: true },
   { name: "Barium Enema (Double Contrast)", modality: "FLUORO", body: "Colon", contrast: true },
   { name: "Cystogram / Voiding Cystourethrogram (VCUG)", modality: "FLUORO", body: "Bladder/Urethra", contrast: true },
 ];
-
-// ─── Modality colour palette ──────────────────────────────────────────────────
 
 interface ModalityStyle {
   bg: string;
@@ -171,8 +156,6 @@ const MODALITY_STYLE: Record<ImagingModality, ModalityStyle> = {
 
 const ALL_MODALITIES: ImagingModality[] = ["XR", "CT", "MRI", "US", "NM", "PET", "DEXA", "MAMMO", "FLUORO"];
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export function ImagingExamCombobox({
   value,
   onSelect,
@@ -189,7 +172,6 @@ export function ImagingExamCombobox({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // ── Close on outside click ──
   useEffect(() => {
     function onOutside(e: MouseEvent) {
       const target = e.target as Node;
@@ -450,8 +432,6 @@ export function ImagingExamCombobox({
     </div>
   );
 }
-
-// ─── ModalityPill sub-component ───────────────────────────────────────────────
 
 function ModalityPill({
   modality,

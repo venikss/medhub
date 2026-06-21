@@ -3,6 +3,7 @@
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/organisms/AppSidebar";
 import { Topbar } from "@/components/organisms/Topbar";
+import { AIAssistantFloating } from "@/components/organisms/AIAssistantFloating";
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -18,6 +19,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     {children}
                 </main>
             </SidebarInset>
+            <AIAssistantFloating />
         </SidebarProvider>
     );
 }

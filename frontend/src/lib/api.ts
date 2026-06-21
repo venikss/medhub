@@ -63,7 +63,6 @@ function writeStoredAuth(nextState: StoredAuthState | null) {
     );
     window.dispatchEvent(new CustomEvent("medhub-auth-refreshed", { detail: nextState }));
   } catch {
-    // Ignore storage write failures.
   }
 }
 
@@ -90,7 +89,6 @@ function clearStoredAuth() {
     );
     window.dispatchEvent(new CustomEvent("medhub-auth-refreshed", { detail: null }));
   } catch {
-    // Ignore storage write failures.
   }
 }
 
@@ -119,7 +117,6 @@ function flattenErrorValue(value: unknown): string | null {
   return null;
 }
 
-// Mutex to prevent concurrent token refresh attempts
 let refreshPromise: Promise<{ token: string; refreshToken: string } | null> | null = null;
 
 export async function apiFetch<T = unknown>(path: string, init: ApiRequestInit = {}): Promise<T> {
@@ -148,7 +145,6 @@ export async function apiFetch<T = unknown>(path: string, init: ApiRequestInit =
   ) {
     const refreshToken = storedAuth?.refreshToken;
     if (refreshToken) {
-      // Deduplicate concurrent refresh attempts with a shared promise
       if (!refreshPromise) {
         refreshPromise = (async () => {
           try {
@@ -204,7 +200,6 @@ export async function apiFetch<T = unknown>(path: string, init: ApiRequestInit =
         window.location.href = "/login";
       }
     } else {
-      // No refresh token available — redirect to login
       clearStoredAuth();
       if (isBrowser()) {
         window.location.href = "/login";
@@ -242,7 +237,6 @@ async function handleApiError<T>(_response: Response): Promise<T> {
     try {
       errorMessage = await _response.text();
     } catch {
-      // ignore parse failures and keep the default message
     }
   }
   throw new Error(errorMessage || "Request failed");

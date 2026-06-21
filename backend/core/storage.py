@@ -7,7 +7,6 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings
 
-
 def upload_file(file_obj, folder: str, original_name: str) -> dict:
     """
     Upload a file to the configured storage backend.
@@ -30,7 +29,6 @@ def upload_file(file_obj, folder: str, original_name: str) -> dict:
         "uploadedAt": timezone.now().isoformat(),
     }
 
-
 def upload_response(upload_result: dict) -> dict:
     """Return the spec-standard upload response shape."""
     return {
@@ -39,26 +37,22 @@ def upload_response(upload_result: dict) -> dict:
         "uploadedAt": upload_result.get("uploadedAt"),
     }
 
-
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png"}
 ALLOWED_PDF_TYPES = {"application/pdf"}
 ALLOWED_DOCUMENT_TYPES = ALLOWED_PDF_TYPES | ALLOWED_IMAGE_TYPES
 
-MAX_AVATAR_SIZE = 2 * 1024 * 1024     # 2 MB
-MAX_CONSENT_SIZE = 10 * 1024 * 1024   # 10 MB
-MAX_LAB_REPORT_SIZE = 10 * 1024 * 1024  # 10 MB
-MAX_INSURANCE_CARD_SIZE = 5 * 1024 * 1024  # 5 MB
+MAX_AVATAR_SIZE = 2 * 1024 * 1024
+MAX_CONSENT_SIZE = 10 * 1024 * 1024
+MAX_LAB_REPORT_SIZE = 10 * 1024 * 1024
+MAX_INSURANCE_CARD_SIZE = 5 * 1024 * 1024
 
-
-# Map MIME types to their expected magic-byte signatures
 _MAGIC_SIGNATURES = {
     "image/jpeg": [b"\xff\xd8\xff"],
     "image/png": [b"\x89PNG\r\n\x1a\n"],
     "application/pdf": [b"%PDF"],
 }
 
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf"}
-
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf", ".dcm"}
 
 def validate_file(file_obj, allowed_types: set, max_size: int | None = None):
     """Raise ValueError if file doesn't meet constraints."""
@@ -70,7 +64,6 @@ def validate_file(file_obj, allowed_types: set, max_size: int | None = None):
         raise ValueError(
             f"Invalid file type '{content_type}'. Allowed: {', '.join(allowed_types)}"
         )
-    # Verify actual file content matches claimed type via magic bytes
     header = file_obj.read(8)
     file_obj.seek(0)
     signatures = _MAGIC_SIGNATURES.get(content_type)

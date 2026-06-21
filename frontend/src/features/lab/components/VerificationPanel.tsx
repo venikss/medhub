@@ -30,13 +30,10 @@ export function VerificationPanel({ panel, className, onStatusChange }: Verifica
     if (!token || loading) return;
     try {
       setLoading(true);
-      // First verify the panel
       if (panel.status !== "verified") {
         await verifyPanel(panel.id, token);
       }
-      // Then release the report (if one exists) — release creates the report if needed
       try {
-        // Find or create the report for this panel, then release it
         const { listLabReports } = await import("@/features/lab/api");
         const reports = await listLabReports({ patientId: panel.patientId }, token);
         const report = reports.find((r) => r.panelId === panel.id);
@@ -44,7 +41,6 @@ export function VerificationPanel({ panel, className, onStatusChange }: Verifica
           await releaseLabReport(report.id, comment || undefined, token);
         }
       } catch {
-        // Report release is best-effort; panel verification is the key action
       }
       onStatusChange?.();
     } catch (err: any) {

@@ -4,6 +4,18 @@ from django.db.models import Count
 
 from apps.cdss.models import CDSSRecommendation, CDSSSeverity, CDSSSourceModule, CDSSStatus
 
+def _neo4j_val(v):
+    """Convert Neo4j temporal/spatial types to JSON-safe primitives."""
+    if v is None:
+        return None
+    type_name = type(v).__name__
+    if type_name in ("DateTime", "Date", "Time", "Duration"):
+        return str(v)
+    if isinstance(v, dict):
+        return {k: _neo4j_val(val) for k, val in v.items()}
+    if isinstance(v, list):
+        return [_neo4j_val(i) for i in v]
+    return v
 
 class GraphService:
     @staticmethod
@@ -19,9 +31,6 @@ class GraphService:
         results, _ = db.cypher_query(query, params or {})
         return results or []
 
-    # ------------------------------------------------------------------
-    # Drug safety graph queries (DDI, allergy cross-reactivity, risk groups)
-    # ------------------------------------------------------------------
     @staticmethod
     def get_patient_ddi_alerts(patient_uuid: str) -> list[dict]:
         """Return pairwise DDI alerts for a patient's current prescriptions."""
@@ -48,10 +57,94 @@ class GraphService:
             "drug_class_nodes": GraphService._count_scalar("MATCH (c:DrugClassNode) RETURN count(c)"),
             "ddi_pairs": GraphService._count_scalar(
                 "MATCH ()-[r:INTERACTS_WITH]->() RETURN count(r)"
-            ) // 2,  # bi-directional, so halve for unique pairs
+            ) // 2,
             "allergen_groups": GraphService._count_scalar("MATCH (g:AllergyCrossReactivityGroupNode) RETURN count(g)"),
             "risk_groups": GraphService._count_scalar("MATCH (g:DrugInteractionGroupNode) RETURN count(g)"),
         }
+
+    @staticmethod
+    def get_kg_differential(symptom_terms: list[str]) -> str:
+        """
+        Given a list of symptom keyword terms extracted from the doctor's query,
+        traverse HAS_SYMPTOM edges backwards from SymptomNode to DiseaseNode and
+        return a ranked differential diagnosis block for LLM injection.
+
+        Only diseases that match at least 50% of the input symptom terms (and at
+        least 2 symptoms) are returned — this ensures only high-confidence candidates
+        are surfaced rather than every disease with a single shared symptom.
+
+        Returns an empty string if no matches found (safe to concatenate).
+        """
+        if not symptom_terms:
+            return ""
+
+        terms_lower = [t.strip().lower() for t in symptom_terms if t.strip()]
+        if not terms_lower:
+            return ""
+
+        min_matches = max(2, int(len(terms_lower) * 0.5))
+
+        result, _ = db.cypher_query(
+            """
+            MATCH (s:SymptomNode)
+            WHERE any(term IN $terms WHERE
+                toLower(s.name) CONTAINS term OR
+                toLower(coalesce(s.synonyms, '')) CONTAINS term)
+            WITH s
+            MATCH (d:DiseaseNode)-[:HAS_SYMPTOM]->(s)
+            WITH d, count(s) AS match_count, collect(s.name)[..4] AS matched_symptoms
+            WHERE match_count >= $min_matches
+            RETURN d.name, match_count, matched_symptoms,
+                   coalesce(d.icd_10, d.omim_id, '') AS code
+            ORDER BY match_count DESC
+            LIMIT 5
+            """,
+            {"terms": terms_lower, "min_matches": min_matches},
+        )
+
+        if not result:
+            return ""
+
+        lines = ["=== KG Differential Diagnosis (high-confidence symptom matches) ==="]
+        for row in result:
+            disease_name, match_count, matched_symptoms, code = row
+            code_str = f" [{code}]" if code else ""
+            symptoms_str = ", ".join(matched_symptoms)
+            lines.append(
+                f"  {disease_name}{code_str} — {match_count}/{len(terms_lower)} symptoms matched: {symptoms_str}"
+            )
+        return "\n".join(lines)
+
+    @staticmethod
+    def _extract_symptom_terms(text: str) -> list[str]:
+        """
+        Fast keyword extraction from free text — no LLM call needed.
+        Matches against a curated list of clinical symptom keywords so that
+        common terms in the doctor's query are passed to get_kg_differential.
+        """
+        SYMPTOM_KEYWORDS = [
+            "chest pain", "shortness of breath", "dyspnea", "fatigue", "fever",
+            "headache", "nausea", "vomiting", "abdominal pain", "diarrhea",
+            "constipation", "weight loss", "weight gain", "edema", "swelling",
+            "hypertension", "hypotension", "tachycardia", "bradycardia",
+            "palpitations", "syncope", "dizziness", "confusion", "weakness",
+            "numbness", "tremor", "seizure", "cough", "hemoptysis", "wheezing",
+            "stridor", "jaundice", "hematuria", "oliguria", "polyuria",
+            "polydipsia", "anemia", "pallor", "bleeding", "bruising", "rash",
+            "pruritus", "anxiety", "depression", "insomnia", "back pain",
+            "joint pain", "muscle pain", "ascites", "hepatomegaly",
+            "splenomegaly", "lymphadenopathy", "neck stiffness", "photophobia",
+            "diplopia", "dysarthria", "dysphagia", "haemoptysis", "haematuria",
+            "pyrexia", "rigor", "chills", "night sweats", "pleuritic pain",
+            "chest tightness", "orthopnoea", "paroxysmal nocturnal dyspnoea",
+            "peripheral oedema", "leg swelling", "calf pain", "claudication",
+            "palpitation", "near-syncope", "presyncope", "vertigo", "tinnitus",
+            "epistaxis", "haematemesis", "melaena", "rectal bleeding",
+            "dysuria", "frequency", "urgency", "flank pain", "loin pain",
+            "amenorrhoea", "menorrhagia", "discharge", "redness", "warmth",
+        ]
+        text_lower = text.lower()
+        return [kw for kw in SYMPTOM_KEYWORDS if kw in text_lower]
 
     @staticmethod
     def get_patient_structured_snapshot(patient_uuid: str) -> dict:
@@ -74,8 +167,8 @@ class GraphService:
 
         for node_labels, node_props, rel_type, rel_props in results:
             node_labels = node_labels or []
-            node_props = node_props or {}
-            rel_props = rel_props or {}
+            node_props = _neo4j_val(node_props or {})
+            rel_props = _neo4j_val(rel_props or {})
 
             if not node_labels or not rel_type:
                 continue
@@ -130,7 +223,7 @@ class GraphService:
                         "status": node_props.get("status"),
                         "panelName": node_props.get("panel_name"),
                         "isCritical": node_props.get("is_critical"),
-                        "observedAt": rel_props.get("observed_at"),
+                        "observedAt": _neo4j_val(rel_props.get("observed_at")),
                     }
                 )
             elif rel_type == "HAS_RAD_REPORT" and "RadiologyReportNode" in node_labels:
@@ -143,7 +236,22 @@ class GraphService:
                         "impression": node_props.get("impression"),
                         "recommendations": node_props.get("recommendations"),
                         "status": node_props.get("status"),
-                        "reportedAt": rel_props.get("reported_at"),
+                        "reportedAt": _neo4j_val(rel_props.get("reported_at")),
+                    }
+                )
+            elif rel_type == "HAS_IMAGING_ORDER" and "ImagingOrderNode" in node_labels:
+                snapshot.setdefault("imagingOrders", []).append(
+                    {
+                        "id": node_props.get("order_uid"),
+                        "modality": node_props.get("modality"),
+                        "examName": node_props.get("exam_name"),
+                        "bodyPart": node_props.get("body_part"),
+                        "indication": node_props.get("indication"),
+                        "priority": node_props.get("priority"),
+                        "status": node_props.get("status"),
+                        "contrastRequired": node_props.get("contrast_required"),
+                        "accessionNumber": node_props.get("accession_number"),
+                        "orderedAt": _neo4j_val(rel_props.get("ordered_at")),
                     }
                 )
 
@@ -227,6 +335,22 @@ class GraphService:
                     context_sentences.append(f"Patient has radiology report for {exam_name} ({'; '.join(details)}).")
                 else:
                     context_sentences.append(f"Patient has radiology report for {exam_name}.")
+            elif rel_type == "HAS_IMAGING_ORDER":
+                exam_name = node_props.get("exam_name") or node_props.get("body_part") or node_props.get("modality") or "imaging study"
+                modality = node_props.get("modality") or ""
+                priority = node_props.get("priority") or "routine"
+                order_status = node_props.get("status") or "ordered"
+                indication = node_props.get("indication") or ""
+                contrast = node_props.get("contrast_required") or "false"
+                parts = [f"Status: {order_status}", f"Priority: {priority}"]
+                if indication:
+                    parts.append(f"Indication: {indication}")
+                if contrast == "true":
+                    parts.append("Contrast: required")
+                context_sentences.append(
+                    f"Patient has {'in-progress' if order_status not in ('signed','cancelled') else order_status} "
+                    f"{modality} imaging order for {exam_name} ({'; '.join(parts)})."
+                )
 
         if not context_sentences:
             return "Patient exists in the knowledge graph but has no known medical relationships."
@@ -342,7 +466,6 @@ class GraphService:
 
         return "\n".join(lines)
 
-
         query = """
         MATCH (n)
         OPTIONAL MATCH (n)-[r]->(m)
@@ -455,7 +578,7 @@ class GraphService:
                 rel2_label,
             ) = row
 
-            patient_props = patient_props or {}
+            patient_props = _neo4j_val(patient_props or {})
             if patient_id is not None and patient_id not in nodes_map:
                 nodes_map[patient_id] = {
                     "id": str(patient_id),
@@ -465,7 +588,7 @@ class GraphService:
 
             if neighbor_id is not None:
                 neighbor_group = (neighbor_labels or ["Node"])[0]
-                neighbor_props = neighbor_props or {}
+                neighbor_props = _neo4j_val(neighbor_props or {})
                 if neighbor_id not in nodes_map:
                     nodes_map[neighbor_id] = {
                         "id": str(neighbor_id),
@@ -482,7 +605,7 @@ class GraphService:
 
             if secondary_id is not None:
                 secondary_group = (secondary_labels or ["Node"])[0]
-                secondary_props = secondary_props or {}
+                secondary_props = _neo4j_val(secondary_props or {})
                 if secondary_id not in nodes_map:
                     nodes_map[secondary_id] = {
                         "id": str(secondary_id),

@@ -59,8 +59,8 @@ export function BedsideSummary({ patient, nextTask, overdueTasks, lastVitals, cl
             {patient.acuity.toUpperCase()}
           </span>
         )}
-        {patient.allergies && patient.allergies.length > 0 ? (
-          patient.allergies.map((a: any, i: number) => {
+{(() => { const al = Array.isArray(patient.allergies) ? patient.allergies : typeof patient.allergies === "string" && patient.allergies ? patient.allergies.split(",").map((s: string) => s.trim()).filter(Boolean) : []; return al.length > 0 ? (
+          al.map((a: any, i: number) => {
             const label = typeof a === "string" ? a : a.substance ?? a.reaction ?? JSON.stringify(a);
             return <Badge key={i} variant="destructive" className="text-[9px] px-1 py-0">{label}</Badge>;
           })
@@ -68,7 +68,7 @@ export function BedsideSummary({ patient, nextTask, overdueTasks, lastVitals, cl
           <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">
             <Shield className="h-2.5 w-2.5" /> NKDA
           </span>
-        )}
+        ); })()}
         {patient.diagnosis && (
           <span className="text-[10px] text-muted-foreground truncate max-w-[160px]">{patient.diagnosis}</span>
         )}

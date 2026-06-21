@@ -1,7 +1,6 @@
 ﻿from django.contrib import admin
 from apps.authentication.models import UserRole
 
-
 class RoleRestrictedAdminMixin:
     required_role = None
     view_roles = ()
@@ -27,7 +26,6 @@ class RoleRestrictedAdminMixin:
 
     def has_delete_permission(self, request, obj=None):
         return self._can_edit(request)
-
 
 from .models import Vitals, IntakeOutput, PainAssessment, MAREntry, NursingNote, Task, Wound, Handoff, DischargeChecklistItem
 
@@ -78,7 +76,6 @@ class IntakeOutputAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     search_fields = ["patient__mrn"]
     autocomplete_fields = ["patient", "recorded_by"]
 
-
 @admin.register(PainAssessment)
 class PainAssessmentAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     required_role = UserRole.NURSE
@@ -87,7 +84,6 @@ class PainAssessmentAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     list_filter = ["score"]
     search_fields = ["patient__mrn", "location"]
     autocomplete_fields = ["patient", "recorded_by"]
-
 
 @admin.register(Wound)
 class WoundAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
@@ -98,7 +94,6 @@ class WoundAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     search_fields = ["patient__mrn", "location"]
     autocomplete_fields = ["patient", "recorded_by"]
 
-
 @admin.register(Handoff)
 class HandoffAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     required_role = UserRole.NURSE
@@ -107,7 +102,6 @@ class HandoffAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     list_filter = ["shift_type", "shift_date"]
     search_fields = ["patient__mrn", "room"]
     autocomplete_fields = ["patient", "ward", "from_nurse", "to_nurse"]
-
 
 @admin.register(DischargeChecklistItem)
 class DischargeChecklistItemAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):

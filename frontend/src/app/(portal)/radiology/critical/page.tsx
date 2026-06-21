@@ -4,6 +4,16 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, History } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { CriticalFindingBanner } from "@/features/radiology/components/CriticalFindingBanner";
 import { ModalityBadge } from "@/features/radiology/components/ModalityBadge";
@@ -17,6 +27,13 @@ import { cn } from "@/lib/utils";
 export default function CriticalFindingsPage() {
   const token = useAuthStore((state) => state.token);
   const [findings, setFindings] = useState<CriticalFinding[]>([]);
+
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notifyTargetId, setNotifyTargetId] = useState<string | null>(null);
+  const [notifiedTo, setNotifiedTo] = useState("");
+  const [callbackNumber, setCallbackNumber] = useState("");
+  const [notifyBusy, setNotifyBusy] = useState(false);
+  const [notifyError, setNotifyError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,13 +50,31 @@ export default function CriticalFindingsPage() {
     };
   }, [token]);
 
-  async function handleNotify(id: string) {
-    const updated = await notifyCriticalFinding(
-      id,
-      { notifiedTo: "Ordering Physician", callbackNumber: "01000000000" },
-      token ?? undefined,
-    );
-    setFindings((prev) => prev.map((finding) => (finding.id === id ? updated : finding)));
+  function openNotifyDialog(id: string) {
+    setNotifyTargetId(id);
+    setNotifiedTo("");
+    setCallbackNumber("");
+    setNotifyError(null);
+    setNotifyOpen(true);
+  }
+
+  async function handleNotifyConfirm() {
+    if (!notifyTargetId || !notifiedTo.trim()) return;
+    setNotifyBusy(true);
+    setNotifyError(null);
+    try {
+      const updated = await notifyCriticalFinding(
+        notifyTargetId,
+        { notifiedTo: notifiedTo.trim(), callbackNumber: callbackNumber.trim() || undefined },
+        token ?? undefined,
+      );
+      setFindings((prev) => prev.map((finding) => (finding.id === notifyTargetId ? updated : finding)));
+      setNotifyOpen(false);
+    } catch (err: any) {
+      setNotifyError(err?.message ?? "Failed to record notification.");
+    } finally {
+      setNotifyBusy(false);
+    }
   }
 
   async function handleAcknowledge(id: string) {
@@ -59,6 +94,44 @@ export default function CriticalFindingsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
+      {/* Notify dialog */}
+      <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Notify Ordering Physician</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Notified to <span className="text-destructive">*</span></Label>
+              <Input
+                placeholder="Physician name or department"
+                value={notifiedTo}
+                onChange={(e) => setNotifiedTo(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Callback number (optional)</Label>
+              <Input
+                placeholder="e.g. +20 100 000 0000"
+                value={callbackNumber}
+                onChange={(e) => setCallbackNumber(e.target.value)}
+              />
+            </div>
+            {notifyError && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" />{notifyError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotifyOpen(false)}>Cancel</Button>
+            <Button onClick={() => void handleNotifyConfirm()} disabled={notifyBusy || !notifiedTo.trim()}>
+              {notifyBusy ? "Saving…" : "Confirm Notification"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
@@ -112,7 +185,7 @@ export default function CriticalFindingsPage() {
               <div key={finding.id} className="space-y-3">
                 <CriticalFindingBanner
                   finding={finding}
-                  onNotify={handleNotify}
+                  onNotify={openNotifyDialog}
                   onAcknowledge={handleAcknowledge}
                 />
                 <RadiologyCDSSPanel patientId={finding.patientId} examName={finding.examName} />

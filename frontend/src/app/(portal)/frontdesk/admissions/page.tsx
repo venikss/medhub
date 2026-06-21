@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BedDouble, ArrowRightLeft, LogOut, UserPlus, Search, Activity } from "lucide-react";
+import { BedDouble, ArrowRightLeft, Clock, LogOut, UserPlus, Search, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +30,9 @@ export default function AdmissionsPage() {
   const [admissions, setAdmissions] = useState<Admission[]>([]);
   const [beds, setBeds] = useState<BedInfo[]>([]);
 
-  // Alert dialog state
   const [alertDialog, setAlertDialog] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: "", message: "" });
   const showAlert = useCallback((title: string, message: string) => setAlertDialog({ open: true, title, message }), []);
 
-  // -- New Admission dialog --
   const [admitDialog, setAdmitDialog] = useState(false);
   const [admitStep, setAdmitStep] = useState<"patient" | "details" | "vitals">("patient");
   const [admitPatients, setAdmitPatients] = useState<Patient[]>([]);
@@ -52,7 +50,6 @@ export default function AdmissionsPage() {
   const [wards, setWards] = useState<Ward[]>([]);
   const [admitBeds, setAdmitBeds] = useState<BedInfo[]>([]);
 
-  // -- Admission vitals step --
   const [admitCreated, setAdmitCreated] = useState<{ id: string; patientId: string; patientName: string } | null>(null);
   const [vSystolic, setVSystolic] = useState("");
   const [vDiastolic, setVDiastolic] = useState("");
@@ -66,14 +63,12 @@ export default function AdmissionsPage() {
   const [vSubmitting, setVSubmitting] = useState(false);
   const [vDone, setVDone] = useState(false);
 
-  // -- Discharge dialog --
   const [dischargeDialog, setDischargeDialog] = useState<Admission | null>(null);
   const [dischargeType, setDischargeType] = useState("home");
   const [dischargeSummary, setDischargeSummary] = useState("");
   const [dischargeFollowUp, setDischargeFollowUp] = useState("");
   const [dischargeSubmitting, setDischargeSubmitting] = useState(false);
 
-  // -- Transfer dialog --
   const [transferDialog, setTransferDialog] = useState<Admission | null>(null);
   const [transferBedId, setTransferBedId] = useState("");
   const [transferReason, setTransferReason] = useState("");
@@ -145,7 +140,6 @@ export default function AdmissionsPage() {
     }
   }
 
-  // -- New Admission flow --
   async function openAdmitDialog() {
     if (!token) return;
     const patients = await listPatients({}, token);
@@ -168,7 +162,6 @@ export default function AdmissionsPage() {
     setVSystolic(""); setVDiastolic(""); setVHr(""); setVSpo2("");
     setVTemp(""); setVRr(""); setVPain(""); setVGcs(""); setVNotes("");
     setVSubmitting(false); setVDone(false);
-    // Fetch lookup data in parallel
     void getFrontDeskAdmissionLookups({}, token)
       .then((lookup) => {
         setDoctors(lookup.doctors);
@@ -217,7 +210,6 @@ export default function AdmissionsPage() {
       if (admitBedId) payload.bedId = admitBedId;
       const created = await createAdmission(payload, token);
       setAdmissions((current) => [created, ...current]);
-      // Transition to vitals entry step
       setAdmitCreated({ id: created.id, patientId: created.patientId, patientName: created.patientName });
       setAdmitStep("vitals");
     } catch (error) {
@@ -263,7 +255,6 @@ export default function AdmissionsPage() {
     }
   }
 
-  // -- Discharge flow --
   function openDischargeDialog(admission: Admission) {
     setDischargeType("home");
     setDischargeSummary("");
@@ -295,7 +286,6 @@ export default function AdmissionsPage() {
     }
   }
 
-  // -- Transfer flow --
   function openTransferDialog(admission: Admission) {
     const availableBeds = beds.filter((bed) => bed.status === "available");
     if (availableBeds.length === 0) {
@@ -694,79 +684,109 @@ export default function AdmissionsPage() {
         ))}
       </div>
 
-      <Card className="border-border/50 shadow-sm">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30">
-                  <th className="text-left font-medium text-muted-foreground p-3">Patient</th>
-                  <th className="text-left font-medium text-muted-foreground p-3">Type</th>
-                  <th className="text-left font-medium text-muted-foreground p-3">Doctor</th>
-                  <th className="text-left font-medium text-muted-foreground p-3">Department</th>
-                  <th className="text-left font-medium text-muted-foreground p-3">Ward / Bed</th>
-                  <th className="text-left font-medium text-muted-foreground p-3">Admitted</th>
-                  <th className="text-left font-medium text-muted-foreground p-3">Status</th>
-                  <th className="text-right font-medium text-muted-foreground p-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((admission) => (
-                  <tr key={admission.id} className="border-b border-border/30 hover:bg-muted/20 transition-colors">
-                    <td className="p-3">
+      {filtered.length === 0 ? (
+        <Card className="border-border/50">
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-14 text-muted-foreground">
+            <BedDouble className="h-12 w-12 text-muted-foreground/20" />
+            <p className="text-sm font-medium">No admissions in this category</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((admission) => {
+            const initials = admission.patientName
+              .split(" ")
+              .map((n: string) => n[0] ?? "")
+              .slice(0, 2)
+              .join("")
+              .toUpperCase();
+            const typeColor: Record<string, string> = {
+              inpatient: "bg-sky-500/15 text-sky-700 border-sky-200",
+              outpatient: "bg-emerald-500/15 text-emerald-700 border-emerald-200",
+              emergency: "bg-red-500/15 text-red-700 border-red-200",
+              observation: "bg-amber-500/15 text-amber-700 border-amber-200",
+            };
+            const admittedDate = new Date(admission.admittedAt);
+            const diffHours = Math.floor((Date.now() - admittedDate.getTime()) / 3_600_000);
+            const lengthOfStay = diffHours < 24 ? `${diffHours}h` : `${Math.floor(diffHours / 24)}d`;
+            return (
+              <div
+                key={admission.id}
+                className="flex flex-col overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm transition-all hover:shadow-md"
+              >
+                {/* Top accent bar */}
+                <div className={`h-1.5 w-full ${admission.type === "emergency" ? "bg-red-500" : admission.type === "inpatient" ? "bg-sky-500" : admission.type === "outpatient" ? "bg-emerald-500" : "bg-amber-400"}`} />
+
+                <div className="flex items-start gap-3 p-4">
+                  {/* Avatar */}
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-border/50 bg-muted text-sm font-bold text-muted-foreground">
+                    {initials}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-medium">{admission.patientName}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{admission.mrn}</p>
+                        <p className="text-sm font-semibold">{admission.patientName}</p>
+                        <p className="font-mono text-[10px] text-muted-foreground">{admission.mrn}</p>
                       </div>
-                    </td>
-                    <td className="p-3">
-                      <Badge variant="outline" className="text-[10px] capitalize">{admission.type}</Badge>
-                    </td>
-                    <td className="p-3 text-muted-foreground">{admission.admittingDoctor}</td>
-                    <td className="p-3">{admission.department}</td>
-                    <td className="p-3">
-                      {admission.ward ? (
-                        <span className="text-xs">{admission.ward} · {admission.bed}</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
+                      <StatusBadge status={admission.status} />
+                    </div>
+
+                    <div className="mt-2 space-y-1">
+                      {/* Type badge */}
+                      <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium capitalize ${typeColor[admission.type] ?? "bg-muted text-muted-foreground"}`}>
+                        {admission.type}
+                      </span>
+
+                      {/* Ward/Bed */}
+                      {admission.ward && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <BedDouble className="h-3.5 w-3.5 shrink-0 text-sky-500" />
+                          <span>{admission.ward}{admission.bed ? ` · Bed ${admission.bed}` : ""}</span>
+                        </div>
                       )}
-                    </td>
-                    <td className="p-3 text-xs text-muted-foreground">
-                      {new Date(admission.admittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    </td>
-                    <td className="p-3"><StatusBadge status={admission.status} /></td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs gap-1"
-                          title="Transfer"
-                          onClick={() => openTransferDialog(admission)}
-                        >
-                          <ArrowRightLeft className="h-3 w-3" /> Transfer
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs gap-1 text-red-600 hover:text-red-700"
-                          title="Discharge"
-                          onClick={() => openDischargeDialog(admission)}
-                        >
-                          <LogOut className="h-3 w-3" /> Discharge
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {filtered.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">No admissions matching this filter.</p>
-          )}
-        </CardContent>
-      </Card>
+
+                      {/* Doctor */}
+                      {admission.admittingDoctor && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Activity className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                          <span className="truncate">Dr. {admission.admittingDoctor}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-auto flex items-center justify-between border-t border-border/30 bg-muted/20 px-4 py-2">
+                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span>LOS {lengthOfStay} · {admittedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[11px] gap-1"
+                      onClick={() => openTransferDialog(admission)}
+                    >
+                      <ArrowRightLeft className="h-3 w-3" /> Transfer
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[11px] gap-1 text-red-600 hover:text-red-700"
+                      onClick={() => openDischargeDialog(admission)}
+                    >
+                      <LogOut className="h-3 w-3" /> Discharge
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

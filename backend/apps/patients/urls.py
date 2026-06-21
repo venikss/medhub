@@ -6,7 +6,6 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # Patient CRUD
     path("", views.PatientListCreateView.as_view(), name="patient-list-create"),
     path("/", views.PatientListCreateView.as_view(), name="patient-list-create-slash"),
     path("search", views.PatientSearchView.as_view(), name="patient-search"),
@@ -22,12 +21,10 @@ urlpatterns = [
     path("<uuid:pk>/insurance/card", views.PatientInsuranceCardView.as_view(), name="patient-insurance-card"),
     path("<uuid:pk>/insurance/card/", views.PatientInsuranceCardView.as_view(), name="patient-insurance-card-slash"),
 
-    # Consents
     path("<uuid:patient_pk>/consents/", views.ConsentListCreateView.as_view(), name="consent-list-create"),
     path("<uuid:patient_pk>/consents/<uuid:consent_pk>/sign/", views.ConsentSignView.as_view(), name="consent-sign"),
     path("<uuid:patient_pk>/consents/<uuid:consent_pk>/upload/", views.ConsentFileUploadView.as_view(), name="consent-upload"),
 
-    # Admissions
     path("admissions", views.AdmissionListCreateView.as_view(), name="admission-list-create"),
     path("admissions/", views.AdmissionListCreateView.as_view(), name="admission-list-create-slash"),
     path("admissions/<uuid:pk>", views.AdmissionDetailView.as_view(), name="admission-detail"),
@@ -48,7 +45,6 @@ urlpatterns = [
     path("frontdesk/patients/<uuid:pk>/summary", views.FrontDeskPatientSummaryView.as_view(), name="frontdesk-patient-summary"),
     path("frontdesk/patients/<uuid:pk>/summary/", views.FrontDeskPatientSummaryView.as_view(), name="frontdesk-patient-summary-slash"),
 
-    # Beds & Wards
     path("wards", views.WardListView.as_view(), name="ward-list"),
     path("wards/", views.WardListView.as_view(), name="ward-list-slash"),
     path("beds", views.BedListView.as_view(), name="bed-list"),
@@ -58,14 +54,12 @@ urlpatterns = [
     path("beds/<uuid:pk>/status", views.BedStatusView.as_view(), name="bed-status"),
     path("beds/<uuid:pk>/status/", views.BedStatusView.as_view(), name="bed-status-slash"),
 
-    # Queue
     path("queue/", views.QueueListCreateView.as_view(), name="queue-list-create"),
     path("queue/stats/", views.QueueStatsView.as_view(), name="queue-stats"),
-    path("queue/<uuid:pk>/status/", views.QueueStatusView.as_view(), name="queue-status"),  # FIXED: added
+    path("queue/<uuid:pk>/status/", views.QueueStatusView.as_view(), name="queue-status"),
     path("queue/<uuid:pk>/call/", views.QueueCallView.as_view(), name="queue-call"),
 
-    # Appointments
     path("appointments/", views.AppointmentListCreateView.as_view(), name="appointment-list-create"),
     path("appointments/<uuid:pk>/", views.AppointmentDetailView.as_view(), name="appointment-detail"),
-    path("appointments/<uuid:pk>/status/", views.AppointmentStatusView.as_view(), name="appointment-status"),  # FIXED: added
+    path("appointments/<uuid:pk>/status/", views.AppointmentStatusView.as_view(), name="appointment-status"),
 ]

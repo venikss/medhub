@@ -6,7 +6,6 @@ from rest_framework import serializers
 from core.standards import is_valid_cpt_or_local
 from .models import Department, Ward, Bed, AuditLog, SystemSetting, RolePermission, LabCatalogItem, RadiologyCatalogItem, ServiceCatalogItem
 
-
 class DepartmentSerializer(serializers.ModelSerializer):
     headId = serializers.UUIDField(source="head_id", required=False, allow_null=True)
     floorNumber = serializers.IntegerField(source="floor_number", required=False, allow_null=True)
@@ -22,6 +21,36 @@ class DepartmentSerializer(serializers.ModelSerializer):
             "staffCount", "activePatients", "bedCount", "createdAt",
         ]
         extra_kwargs = {"createdAt": {"source": "created_at", "read_only": True}}
+
+    def validate_name(self, value):
+        v = str(value or "").strip()
+        if not v:
+            raise serializers.ValidationError("name is required.")
+        if len(v) > 200:
+            raise serializers.ValidationError("name must not exceed 200 characters.")
+        return v
+
+    def validate_code(self, value):
+        import re
+        v = str(value or "").strip().upper()
+        if not v:
+            raise serializers.ValidationError("code is required.")
+        if not re.match(r'^[A-Z0-9\-_]{1,20}$', v):
+            raise serializers.ValidationError("code must be 1–20 uppercase letters, digits, hyphens, or underscores.")
+        return v
+
+    def validate_phone(self, value):
+        import re
+        if value in (None, ""):
+            return value
+        if not re.match(r'^[0-9+\-\s()]{7,20}$', str(value).strip()):
+            raise serializers.ValidationError("phone format is invalid.")
+        return str(value).strip()
+
+    def validate_description(self, value):
+        if value and len(value) > 1000:
+            raise serializers.ValidationError("description must not exceed 1000 characters.")
+        return value
 
     def get_staffCount(self, obj):
         return obj.staff_members.filter(deleted_at__isnull=True).count()
@@ -41,7 +70,6 @@ class DepartmentSerializer(serializers.ModelSerializer):
         data["createdAt"] = instance.created_at.isoformat()
         return data
 
-
 class WardSerializer(serializers.ModelSerializer):
     departmentId = serializers.UUIDField(source="department_id")
     headNurseId = serializers.UUIDField(source="head_nurse_id", required=False, allow_null=True)
@@ -54,6 +82,24 @@ class WardSerializer(serializers.ModelSerializer):
             "id", "name", "code", "departmentId", "type", "status",
             "floorNumber", "building", "totalBeds", "headNurseId",
         ]
+
+    def validate_name(self, value):
+        v = str(value or "").strip()
+        if not v or len(v) > 200:
+            raise serializers.ValidationError("name must be 1–200 characters.")
+        return v
+
+    def validate_code(self, value):
+        import re
+        v = str(value or "").strip().upper()
+        if not re.match(r'^[A-Z0-9\-_]{1,20}$', v):
+            raise serializers.ValidationError("code must be 1–20 uppercase letters, digits, hyphens, or underscores.")
+        return v
+
+    def validate_totalBeds(self, value):
+        if value is not None and not (1 <= value <= 500):
+            raise serializers.ValidationError("totalBeds must be between 1 and 500.")
+        return value
 
     def validate_status(self, value):
         if value == "under_maintenance":
@@ -79,7 +125,6 @@ class WardSerializer(serializers.ModelSerializer):
         data["departmentName"] = instance.department.name if instance.department_id else None
         return data
 
-
 class BedSerializer(serializers.ModelSerializer):
     wardId = serializers.UUIDField(source="ward_id")
     roomNumber = serializers.CharField(source="room_number", required=False, allow_null=True)
@@ -89,7 +134,24 @@ class BedSerializer(serializers.ModelSerializer):
         model = Bed
         fields = ["id", "wardId", "number", "bedType", "roomNumber", "status", "features"]
 
-    def validate_bedType(self, value):
+    def validate_number(self, value):
+        import re
+        v = str(value or "").strip()
+        if not v:
+            raise serializers.ValidationError("Bed number is required.")
+        if len(v) > 20:
+            raise serializers.ValidationError("Bed number must not exceed 20 characters.")
+        if not re.match(r'^[A-Za-z0-9\-_\.]+$', v):
+            raise serializers.ValidationError("Bed number may only contain letters, digits, hyphens, underscores, or dots.")
+        return v
+
+    def validate_roomNumber(self, value):
+        if value in (None, ""):
+            return value
+        v = str(value).strip()
+        if len(v) > 20:
+            raise serializers.ValidationError("roomNumber must not exceed 20 characters.")
+        return v
         return {
             "general": "standard",
             "semi-private": "semi-private",
@@ -115,7 +177,6 @@ class BedSerializer(serializers.ModelSerializer):
             "status": instance.status,
             "features": instance.features,
         }
-
 
 class AuditLogSerializer(serializers.ModelSerializer):
     class Meta:
@@ -151,19 +212,16 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "outcome": instance.outcome,
         }
 
-
 class SystemSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = SystemSetting
         fields = ["id", "key", "value", "category", "description", "updatedAt"]
         extra_kwargs = {"updatedAt": {"source": "updated_at", "read_only": True}}
 
-
 class RolePermissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = RolePermission
         fields = ["id", "role", "resource", "action", "allowed"]
-
 
 class LabCatalogSerializer(serializers.ModelSerializer):
     turnaroundHours = serializers.IntegerField(source="turnaround_hours")
@@ -197,7 +255,6 @@ class LabCatalogSerializer(serializers.ModelSerializer):
             "isActive": instance.is_active,
         }
 
-
 class RadiologyCatalogSerializer(serializers.ModelSerializer):
     class Meta:
         model = RadiologyCatalogItem
@@ -226,7 +283,6 @@ class RadiologyCatalogSerializer(serializers.ModelSerializer):
             "preparation": instance.preparation,
             "isActive": instance.is_active,
         }
-
 
 class ServiceCatalogSerializer(serializers.ModelSerializer):
     class Meta:

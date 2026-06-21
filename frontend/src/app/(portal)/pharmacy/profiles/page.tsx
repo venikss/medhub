@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { Pill, Search, Users, AlertTriangle } from "lucide-react";
+import { Pill, Search, Users } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,6 +36,8 @@ function MedProfilesPage() {
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [patients, setPatients] = useState<ProfilePatient[]>([]);
   const [activeMeds, setActiveMeds] = useState<PharmacyPrescription[]>([]);
+  const [onHoldMeds, setOnHoldMeds] = useState<PharmacyPrescription[]>([]);
+  const [historyMeds, setHistoryMeds] = useState<PharmacyPrescription[]>([]);
   const [patientAllergies, setPatientAllergies] = useState<AllergyEntry[]>([]);
   const [patientRefills, setPatientRefills] = useState<RefillRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +91,13 @@ function MedProfilesPage() {
           return;
         }
 
-        setActiveMeds(profile.activeMedications.filter((rx) => rx.status !== "cancelled"));
+        setActiveMeds(profile.activeMedications.filter(
+          (rx) => !["cancelled", "returned", "on-hold"].includes(rx.status)
+        ));
+        setOnHoldMeds(profile.activeMedications.filter((rx) => rx.status === "on-hold"));
+        setHistoryMeds(profile.activeMedications.filter(
+          (rx) => rx.status === "cancelled" || rx.status === "returned"
+        ));
         setPatientAllergies(profile.allergies);
         setPatientRefills(
           profile.refills.map((refill, index) => ({
@@ -108,6 +116,8 @@ function MedProfilesPage() {
       .catch(() => {
         if (!cancelled) {
           setActiveMeds([]);
+          setOnHoldMeds([]);
+          setHistoryMeds([]);
           setPatientAllergies([]);
           setPatientRefills([]);
         }
@@ -225,6 +235,8 @@ function MedProfilesPage() {
               patientName={selectedPatient.name}
               allergies={patientAllergies}
               activeMeds={activeMeds}
+              onHoldMeds={onHoldMeds}
+              historyMeds={historyMeds}
               refills={patientRefills}
             />
           ) : (

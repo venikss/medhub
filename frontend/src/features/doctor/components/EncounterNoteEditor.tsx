@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 export interface EncounterNoteEditorHandle {
     applyField: (field: "assessment" | "plan", value: string) => void;
+    load: (data: { subjective: string; objective: string; assessment: string; plan: string }) => void;
 }
 
 interface EncounterNoteEditorProps {
@@ -77,7 +78,6 @@ const soapSections = [
 
 type SoapKey = "subjective" | "objective" | "assessment" | "plan";
 
-// Auto-growing textarea
 function AutoTextarea({
     value,
     onChange,
@@ -135,14 +135,13 @@ function EncounterNoteEditor({ encounter, patientName, onSave, onSign, onFormCha
         setLastSaved(null);
     };
 
-    // Notify parent of form changes without calling setState during render
     useEffect(() => {
         onFormChangeRef.current?.(form);
     }, [form]);
 
-    // Expose applyField so the AI panel can write assessment/plan back into the editor
     useImperativeHandle(ref, () => ({
         applyField: (field: "assessment" | "plan", value: string) => update(field, value),
+        load: (data) => setForm({ subjective: data.subjective, objective: data.objective, assessment: data.assessment, plan: data.plan }),
     }));
 
     const appendChip = (field: SoapKey, chip: string) => {
@@ -152,7 +151,6 @@ function EncounterNoteEditor({ encounter, patientName, onSave, onSign, onFormCha
             return { ...prev, [field]: current + separator + chip };
         });
         setLastSaved(null);
-        // Focus the textarea after inserting
         setTimeout(() => textareaRefs.current[field]?.focus(), 0);
     };
 
@@ -180,7 +178,6 @@ function EncounterNoteEditor({ encounter, patientName, onSave, onSign, onFormCha
         }
     };
 
-    // ⌘S / Ctrl+S shortcut
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "s") {

@@ -28,7 +28,7 @@ const ADAPTERS: Record<CDSSSourceModule, CDSSModuleAdapter> = {
   system: {
     module: "system",
     label: "System",
-    filterRecommendations: (recs) => recs, // system adapter shows all
+    filterRecommendations: (recs) => recs,
   },
 };
 

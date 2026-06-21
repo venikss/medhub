@@ -21,7 +21,6 @@ MEDICATION_ROUTE_CHOICES = [
     ("other", "Other"),
 ]
 
-
 class EncounterSerializer(serializers.ModelSerializer):
     patientId = serializers.UUIDField(source="patient_id")
     doctorId = serializers.UUIDField(source="doctor_id", read_only=True)
@@ -30,6 +29,8 @@ class EncounterSerializer(serializers.ModelSerializer):
     signedById = serializers.UUIDField(source="signed_by_id", read_only=True, allow_null=True)
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
     updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
+
+    _MAX_NOTE_LEN = 20_000
 
     class Meta:
         model = Encounter
@@ -40,13 +41,24 @@ class EncounterSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "doctorId", "signedAt", "signedById", "createdAt", "updatedAt"]
 
+    def _check_note_len(self, field_name, value):
+        if value and len(value) > self._MAX_NOTE_LEN:
+            raise serializers.ValidationError(
+                f"{field_name} must not exceed {self._MAX_NOTE_LEN:,} characters."
+            )
+        return value
+
+    def validate_subjective(self, value):  return self._check_note_len("subjective", value)
+    def validate_objective(self, value):   return self._check_note_len("objective", value)
+    def validate_assessment(self, value):  return self._check_note_len("assessment", value)
+    def validate_plan(self, value):        return self._check_note_len("plan", value)
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["isSigned"] = instance.status == "signed"
         data["patientName"] = instance.patient.full_name if hasattr(instance, "patient") else None
         data["doctorName"] = instance.doctor.get_full_name() if hasattr(instance, "doctor") else None
         return data
-
 
 class DiagnosisSerializer(serializers.ModelSerializer):
     encounterId = serializers.UUIDField(source="encounter_id", required=False, allow_null=True)
@@ -104,7 +116,6 @@ class DiagnosisSerializer(serializers.ModelSerializer):
         data["diagnosedByName"] = instance.diagnosed_by.get_full_name() if instance.diagnosed_by_id else None
         return data
 
-
 class OrderSerializer(serializers.ModelSerializer):
     patientId = serializers.UUIDField(source="patient_id", required=False, allow_null=True)
     encounterId = serializers.UUIDField(source="encounter_id", required=False, allow_null=True)
@@ -140,7 +151,7 @@ class OrderSerializer(serializers.ModelSerializer):
         patient_id = attrs.get("patient_id", getattr(self.instance, "patient_id", None))
         patient = attrs.get("patient", getattr(self.instance, "patient", None))
         if encounter or encounter_id:
-            pass  # encounter provides implicit patient; FK integrity enforced by DB
+            pass
         elif not patient and not patient_id:
             raise serializers.ValidationError({"patientId": "patientId is required when encounterId is not provided."})
         category = attrs.get("category", getattr(self.instance, "category", None))
@@ -177,7 +188,6 @@ class OrderSerializer(serializers.ModelSerializer):
         data["orderedByName"] = instance.ordered_by.get_full_name() if hasattr(instance, "ordered_by") else None
         return data
 
-
 class PrescriptionSerializer(serializers.ModelSerializer):
     patientId = serializers.UUIDField(source="patient_id", required=False, allow_null=True)
     encounterId = serializers.UUIDField(source="encounter_id", required=False, allow_null=True)
@@ -210,16 +220,35 @@ class PrescriptionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Invalid RxNorm code.")
         return code
 
+    def validate_medicationName(self, value):
+        v = str(value or "").strip()
+        if not v:
+            raise serializers.ValidationError("medicationName is required.")
+        if len(v) > 300:
+            raise serializers.ValidationError("medicationName must not exceed 300 characters.")
+        return v
+
+    def validate_dose(self, value):
+        v = str(value or "").strip()
+        if not v:
+            raise serializers.ValidationError("dose is required.")
+        if len(v) > 100:
+            raise serializers.ValidationError("dose must not exceed 100 characters.")
+        return v
+
+    def validate_instructions(self, value):
+        if value and len(value) > 1000:
+            raise serializers.ValidationError("instructions must not exceed 1000 characters.")
+        return value
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        # UUIDField with source="encounter_id"/"patient_id" stores values under those keys,
-        # not under "encounter"/"patient" (which would require PrimaryKeyRelatedField).
         encounter_id = attrs.get("encounter_id", getattr(self.instance, "encounter_id", None))
         encounter = attrs.get("encounter", getattr(self.instance, "encounter", None))
         patient_id = attrs.get("patient_id", getattr(self.instance, "patient_id", None))
         patient = attrs.get("patient", getattr(self.instance, "patient", None))
         if encounter or encounter_id:
-            pass  # encounter provides implicit patient; FK integrity enforced by DB
+            pass
         elif not patient and not patient_id:
             raise serializers.ValidationError({"patientId": "patientId is required when encounterId is not provided."})
         start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
@@ -238,7 +267,6 @@ class PrescriptionSerializer(serializers.ModelSerializer):
         data["genericName"] = instance.generic_name or None
         data["displayMedicationName"] = instance.medication
         return data
-
 
 class ReferralSerializer(serializers.ModelSerializer):
     patientId = serializers.UUIDField(source="patient_id")

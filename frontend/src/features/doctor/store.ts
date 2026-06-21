@@ -1,27 +1,22 @@
 import { create } from "zustand";
 
 interface DoctorState {
-    // Selected patient for chart view
     selectedPatientId: string | null;
     setSelectedPatientId: (id: string | null) => void;
 
-    // Chart active tab
     chartTab: "summary" | "notes" | "orders" | "medications" | "results";
     setChartTab: (tab: DoctorState["chartTab"]) => void;
 
-    // Encounter editor state
     isNoteEditorOpen: boolean;
     editingEncounterId: string | null;
     openNoteEditor: (encounterId?: string) => void;
     closeNoteEditor: () => void;
 
-    // Order composer state
     isOrderComposerOpen: boolean;
     orderPatientId: string | null;
     openOrderComposer: (patientId?: string) => void;
     closeOrderComposer: () => void;
 
-    // Prescriptions
     isPrescriptionWriterOpen: boolean;
     prescriptionPatientId: string | null;
     openPrescriptionWriter: (patientId?: string) => void;

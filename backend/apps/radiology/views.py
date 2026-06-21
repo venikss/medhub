@@ -1,14 +1,17 @@
 ﻿"""
-Radiology module views â€” RIS-PACS: Orders, Studies, Reports, Critical Findings, Schedules.
-Fixed: is_signed (use status field), reportâ†’study on critical finding, field name mismatches,
-       cancel_reason (doesn't exist, use protocol_notes pattern), missing endpoints added.
+Radiology module views — RIS-PACS: Orders, Studies, Reports, Critical Findings, Schedules.
 """
 
+import io
+import logging
+from django.conf import settings
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+
+logger = logging.getLogger(__name__)
 from django.db.models import Q
 from rest_framework import status
-from rest_framework.parsers import MultiPartParser
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -26,12 +29,13 @@ from apps.authentication.models import User
 from .models import (
     ImagingOrder, ImagingStudy, RadiologyReport, RadCriticalFinding,
     ModalitySchedule, ImagingStudyStatus, RadReportStatus, RadCriticalFindingStatus,
+    DicomSeries, DicomFile,
 )
 from .serializers import (
     ImagingOrderSerializer, ImagingStudySerializer, RadiologyReportSerializer,
     RadCriticalFindingSerializer, ModalityScheduleSerializer,
+    DicomSeriesSerializer,
 )
-
 
 def _sync_order_status(study):
     """Keep the parent ImagingOrder status in sync with the study status."""
@@ -41,7 +45,6 @@ def _sync_order_status(study):
     if order.status != study.status:
         order.status = study.status
         order.save(update_fields=["status"])
-
 
 RadiologyOrderReadWritePermission = ReadWriteRolePermission.for_roles(
     [UserRole.RADIOLOGIST, UserRole.DOCTOR],
@@ -57,7 +60,6 @@ RadiologyCancelPermission = ReadWriteRolePermission.for_roles(
     [UserRole.RADIOLOGIST, UserRole.DOCTOR],
     [UserRole.RADIOLOGIST, UserRole.DOCTOR],
 )
-
 
 def _create_cdss_urgent_finding(study, patient_id, description):
     """Auto-create CDSS recommendation for a critical radiology finding."""
@@ -86,11 +88,6 @@ def _create_cdss_urgent_finding(study, patient_id, description):
         "targetRoles": rec.target_roles,
     }, target_roles=rec.target_roles)
 
-
-# ---------------------------------------------------------------------------
-# Imaging Orders
-# ---------------------------------------------------------------------------
-
 class RadiologyStatsView(APIView):
     permission_classes = [IsAuthenticated, RadiologyDepartmentPermission]
 
@@ -110,7 +107,6 @@ class RadiologyStatsView(APIView):
             "pendingCritical": RadCriticalFinding.objects.exclude(status=RadCriticalFindingStatus.ACKNOWLEDGED).count(),
             "statOrders": ImagingOrder.objects.filter(priority__in=["stat", "urgent"]).count(),
         })
-
 
 class RadiologyDashboardView(APIView):
     permission_classes = [IsAuthenticated, RadiologyDepartmentPermission]
@@ -190,7 +186,6 @@ class ImagingOrderListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class ImagingOrderDetailView(APIView):
     permission_classes = [IsAuthenticated, RadiologyOrderReadWritePermission]
 
@@ -209,7 +204,6 @@ class ImagingOrderDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(ImagingOrderSerializer(order, context={"request": request}).data)
-
 
 class ImagingOrderProtocolView(APIView):
     """PUT /radiology/orders/:id/protocol â€” radiologist sets protocol."""
@@ -236,7 +230,6 @@ class ImagingOrderProtocolView(APIView):
         order.save(update_fields=["protocol_notes", "protocoled_by", "status"])
         write_audit_log(request, AuditAction.UPDATE, "ImagingOrder", str(order.id), {"action": "protocol"})
         return Response(ImagingOrderSerializer(order, context={"request": request}).data)
-
 
 class ImagingOrderScheduleView(APIView):
     """PUT /radiology/orders/:id/schedule â€” schedule an imaging order."""
@@ -268,7 +261,6 @@ class ImagingOrderScheduleView(APIView):
         order.status = ImagingStudyStatus.SCHEDULED
         order.save(update_fields=["scheduled_at", "scheduled_room", "status"])
         return Response(ImagingOrderSerializer(order, context={"request": request}).data)
-
 
 class ImagingOrderAssignView(APIView):
     """PUT /radiology/orders/:id/assign â€” assign radiologist or technologist."""
@@ -303,7 +295,6 @@ class ImagingOrderAssignView(APIView):
         order.save(update_fields=update_fields)
         return Response(ImagingOrderSerializer(order, context={"request": request}).data)
 
-
 class ImagingOrderCancelView(APIView):
     permission_classes = [IsAuthenticated, RadiologyCancelPermission]
 
@@ -323,7 +314,6 @@ class ImagingOrderCancelView(APIView):
             },
             "imaging order",
         )
-        # Store cancel reason in protocol_notes (model has no cancel_reason field)
         order.protocol_notes = request.data.get("reason", "")
         order.status = ImagingStudyStatus.CANCELLED
         order.cancelled_at = timezone.now()
@@ -332,11 +322,6 @@ class ImagingOrderCancelView(APIView):
         return Response(ImagingOrderSerializer(order, context={"request": request}).data)
 
     post = put
-
-
-# ---------------------------------------------------------------------------
-# Imaging Studies
-# ---------------------------------------------------------------------------
 
 class ImagingStudyListCreateView(APIView):
     permission_classes = [IsAuthenticated, RadiologyDepartmentPermission]
@@ -348,7 +333,6 @@ class ImagingStudyListCreateView(APIView):
         if patient_id := request.query_params.get("patientId"):
             qs = qs.filter(patient_id=patient_id)
         paginator = StandardPagination()
-        # Model field is exam_date, not study_date
         page = paginator.paginate_queryset(qs.order_by("-exam_date"), request)
         return paginator.get_paginated_response(
             ImagingStudySerializer(page, many=True, context={"request": request}).data
@@ -393,7 +377,6 @@ class ImagingStudyListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class ImagingStudyDetailView(APIView):
     """GET /radiology/studies/:id â€” single study detail (was missing)."""
     permission_classes = [IsAuthenticated, RadiologyDepartmentPermission]
@@ -406,7 +389,6 @@ class ImagingStudyDetailView(APIView):
 
     def get(self, request, pk):
         return Response(ImagingStudySerializer(self._get(pk), context={"request": request}).data)
-
 
 class ImagingStudyStatusView(APIView):
     """PUT /radiology/studies/:id/status â€” update study status (was missing)."""
@@ -452,7 +434,6 @@ class ImagingStudyStatusView(APIView):
         _sync_order_status(study)
         return Response(ImagingStudySerializer(study, context={"request": request}).data)
 
-
 class ImagingStudyPriorsView(APIView):
     """GET /radiology/studies/:id/priors -- prior studies for same patient/modality."""
     permission_classes = [IsAuthenticated, RadiologyDepartmentPermission]
@@ -485,7 +466,6 @@ class ImagingStudyPriorsView(APIView):
             })
         return Response(results)
 
-
 class ImagingStudyImageUploadView(APIView):
     """POST /radiology/studies/:id/images - store an image/DICOM upload."""
     permission_classes = [IsAuthenticated, RadiologyDepartmentPermission]
@@ -514,11 +494,6 @@ class ImagingStudyImageUploadView(APIView):
 
         return Response(upload_response(result), status=status.HTTP_201_CREATED)
 
-
-# ---------------------------------------------------------------------------
-# Radiology Reports
-# ---------------------------------------------------------------------------
-
 class RadiologyReportListCreateView(APIView):
     permission_classes = [IsAuthenticated, RadiologyDepartmentPermission]
 
@@ -545,7 +520,6 @@ class RadiologyReportListCreateView(APIView):
             except ImagingStudy.DoesNotExist:
                 raise NotFoundError("Imaging study not found.")
             report = serializer.save(patient_id=study.patient_id, signed_by=None)
-            # Auto-advance study to reading if still acquired
             if study.status in (ImagingStudyStatus.ACQUIRED,):
                 study.status = ImagingStudyStatus.READING
                 study.save(update_fields=["status"])
@@ -556,7 +530,6 @@ class RadiologyReportListCreateView(APIView):
             RadiologyReportSerializer(report, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
 
 class RadiologyReportDetailView(APIView):
     permission_classes = [IsAuthenticated, RadiologyDepartmentPermission]
@@ -574,7 +547,6 @@ class RadiologyReportDetailView(APIView):
 
     def put(self, request, pk):
         report = self._get(pk)
-        # A signed (final/addendum) report can only be edited by the signer
         is_signed = report.status in (RadReportStatus.FINAL, RadReportStatus.ADDENDUM)
         if is_signed and request.user != report.signed_by:
             raise ConflictError("Cannot modify a signed report by another radiologist.")
@@ -583,7 +555,6 @@ class RadiologyReportDetailView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        # Auto-advance study to reported when report has findings/impression
         if report.study_id and report.status in (RadReportStatus.DRAFT, RadReportStatus.PRELIMINARY):
             study = report.study
             has_content = bool(report.findings and report.impression)
@@ -593,7 +564,6 @@ class RadiologyReportDetailView(APIView):
                 study.save(update_fields=["status", "completed_at"])
                 _sync_order_status(study)
         return Response(RadiologyReportSerializer(report, context={"request": request}).data)
-
 
 class RadiologyReportSignView(APIView):
     permission_classes = [IsAuthenticated, IsRadiologist]
@@ -607,7 +577,6 @@ class RadiologyReportSignView(APIView):
             raise ConflictError("Report is already signed.")
         if report.study.status not in (ImagingStudyStatus.ACQUIRED, ImagingStudyStatus.READING, ImagingStudyStatus.REPORTED):
             raise ConflictError("Study must be acquired or reported before signing the report.")
-        # Sign: set status to final, record signer
         report.status = RadReportStatus.FINAL
         report.signed_by = request.user
         report.signed_at = timezone.now()
@@ -621,7 +590,6 @@ class RadiologyReportSignView(APIView):
             {"action": "sign"}, AuditSeverity.HIGH,
         )
         patient = report.patient
-        # Targeted notification to Ordering and Assigned doctors
         order = report.study.order if report.study else None
         ordering_doctor_id = order.ordered_by_id if order else None
         assigned_doctor_id = report.patient.assigned_doctor_id
@@ -642,7 +610,6 @@ class RadiologyReportSignView(APIView):
         if not ordering_doctor_id and not assigned_doctor_id:
             emit_radiology_report_signed(payload)
         return Response(RadiologyReportSerializer(report, context={"request": request}).data)
-
 
 class RadiologyReportAddendumView(APIView):
     permission_classes = [IsAuthenticated, IsRadiologist]
@@ -665,11 +632,6 @@ class RadiologyReportAddendumView(APIView):
         report.save(update_fields=["addendum", "addendum_by", "addendum_at", "status"])
         return Response(RadiologyReportSerializer(report, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Critical Findings
-# ---------------------------------------------------------------------------
-
 class RadCriticalFindingListView(APIView):
     """GET /radiology/critical â€” list critical findings (was at wrong path /critical/list/)."""
     permission_classes = [IsAuthenticated, RadiologyDepartmentPermission]
@@ -677,7 +639,6 @@ class RadCriticalFindingListView(APIView):
     def get(self, request):
         qs = RadCriticalFinding.objects.all()
         if request.query_params.get("unacknowledged"):
-            # status field, not a boolean is_acknowledged
             qs = qs.exclude(status=RadCriticalFindingStatus.ACKNOWLEDGED)
         if patient_id := request.query_params.get("patientId"):
             qs = qs.filter(patient_id=patient_id)
@@ -703,7 +664,6 @@ class RadCriticalFindingListView(APIView):
             status=RadCriticalFindingStatus.IDENTIFIED,
         )
         patient = finding.patient
-        # Targeted notification to Ordering and Assigned doctors
         order = finding.study.order if finding.study else None
         ordering_doctor_id = order.ordered_by_id if order else None
         assigned_doctor_id = finding.patient.assigned_doctor_id
@@ -732,7 +692,6 @@ class RadCriticalFindingListView(APIView):
             RadCriticalFindingSerializer(finding, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
 
 class RadCriticalFindingCreateView(APIView):
     """POST /radiology/critical â€” create a critical finding."""
@@ -754,7 +713,6 @@ class RadCriticalFindingCreateView(APIView):
             status=RadCriticalFindingStatus.IDENTIFIED,
         )
         patient = finding.patient
-        # Targeted notification to Ordering and Assigned doctors
         order = finding.study.order if finding.study else None
         ordering_doctor_id = order.ordered_by_id if order else None
         assigned_doctor_id = finding.patient.assigned_doctor_id
@@ -783,7 +741,6 @@ class RadCriticalFindingCreateView(APIView):
             RadCriticalFindingSerializer(finding, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
 
 class RadCriticalFindingNotifyView(APIView):
     """PUT /radiology/critical/:id/notify â€” record notification of a critical finding (was missing)."""
@@ -814,7 +771,6 @@ class RadCriticalFindingNotifyView(APIView):
         finding.save(update_fields=["notified_to", "callback_number", "notified_at", "status"])
         return Response(RadCriticalFindingSerializer(finding, context={"request": request}).data)
 
-
 class RadCriticalFindingAcknowledgeView(APIView):
     permission_classes = [IsAuthenticated, RadiologyOrderReadWritePermission]
 
@@ -833,7 +789,6 @@ class RadCriticalFindingAcknowledgeView(APIView):
             },
             "radiology critical finding",
         )
-        # Use status field â€” model has no is_acknowledged boolean
         finding.status = RadCriticalFindingStatus.ACKNOWLEDGED
         finding.acknowledged_by = request.user
         finding.acknowledged_at = timezone.now()
@@ -841,11 +796,6 @@ class RadCriticalFindingAcknowledgeView(APIView):
         return Response(RadCriticalFindingSerializer(finding, context={"request": request}).data)
 
     post = put
-
-
-# ---------------------------------------------------------------------------
-# Modality Schedules
-# ---------------------------------------------------------------------------
 
 class ModalityScheduleListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsRadiologist]
@@ -855,7 +805,6 @@ class ModalityScheduleListCreateView(APIView):
         if modality := request.query_params.get("modality"):
             qs = qs.filter(modality=modality)
         if date := request.query_params.get("date"):
-            # Model has a date field, not scheduled_at
             qs = qs.filter(date=date)
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs.order_by("date", "start_time"), request)
@@ -871,7 +820,6 @@ class ModalityScheduleListCreateView(APIView):
             ModalityScheduleSerializer(schedule, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
 
 class ModalityScheduleDetailView(APIView):
     permission_classes = [IsAuthenticated, IsRadiologist]
@@ -897,4 +845,357 @@ class ModalityScheduleDetailView(APIView):
     def delete(self, request, pk):
         self._get(pk).delete()
         return Response({"message": "Schedule cancelled."}, status=status.HTTP_200_OK)
+
+def _extract_dicom_metadata(ds) -> dict:
+    """Extract clinically relevant acquisition metadata from a pydicom Dataset."""
+    def _safe(attr, default=""):
+        try:
+            val = getattr(ds, attr, None)
+            if val is None:
+                return default
+            if hasattr(val, "__iter__") and not isinstance(val, str):
+                return ", ".join(str(v) for v in val)
+            return str(val)
+        except Exception:
+            return default
+
+    return {
+        "modality":           _safe("Modality"),
+        "bodyPartExamined":   _safe("BodyPartExamined"),
+        "seriesDescription":  _safe("SeriesDescription"),
+        "studyDescription":   _safe("StudyDescription"),
+        "manufacturer":       _safe("Manufacturer"),
+        "manufacturerModel":  _safe("ManufacturerModelName"),
+        "kvp":                _safe("KVP"),
+        "tubeCurrent":        _safe("XRayTubeCurrent"),
+        "exposureTime":       _safe("ExposureTime"),
+        "sliceThickness":     _safe("SliceThickness"),
+        "pixelSpacing":       _safe("PixelSpacing"),
+        "rows":               _safe("Rows"),
+        "columns":            _safe("Columns"),
+        "windowCenter":       _safe("WindowCenter"),
+        "windowWidth":        _safe("WindowWidth"),
+        "numberOfFrames":     _safe("NumberOfFrames"),
+        "contrastBolusAgent": _safe("ContrastBolusAgent"),
+        "imageType":          _safe("ImageType"),
+        "sopClassUID":        _safe("SOPClassUID"),
+        "studyDate":          _safe("StudyDate"),
+        "patientAge":         _safe("PatientAge"),
+        "patientSex":         _safe("PatientSex"),
+        "institutionName":    _safe("InstitutionName"),
+    }
+
+class DicomServeView(APIView):
+    """
+    GET /radiology/studies/<id>/dicom-file/
+
+    Authenticated proxy returning the raw DICOM bytes so Cornerstone3D can
+    load via WADO-URI without exposing raw storage URLs to unauthenticated
+    clients.  Supports both local media files and remote (S3/CDN) URLs.
+    """
+    permission_classes = [IsAuthenticated, RadiologyDepartmentPermission]
+
+    def get(self, request, pk):
+        import os
+        import urllib.request as urllib_req
+        from django.http import HttpResponse
+
+        try:
+            study = ImagingStudy.objects.get(id=pk)
+        except ImagingStudy.DoesNotExist:
+            raise NotFoundError("Imaging study not found.")
+
+        if not study.pacs_url:
+            raise NotFoundError("No DICOM file has been uploaded for this study yet.")
+
+        pacs_url = study.pacs_url
+        media_url = getattr(settings, "MEDIA_URL", "/media/")
+        media_root = getattr(settings, "MEDIA_ROOT", "")
+
+        if pacs_url.startswith(media_url) or pacs_url.startswith("/media/"):
+            relative = pacs_url
+            for prefix in (media_url, "/media/"):
+                if relative.startswith(prefix):
+                    relative = relative[len(prefix):]
+                    break
+            file_path = os.path.join(media_root, relative)
+            if not os.path.isfile(file_path):
+                raise NotFoundError("DICOM file not found on disk.")
+            with open(file_path, "rb") as f:
+                content = f.read()
+        else:
+            try:
+                req = urllib_req.Request(pacs_url, headers={"User-Agent": "MedHub-Proxy/1.0"})
+                with urllib_req.urlopen(req, timeout=30) as resp:
+                    content = resp.read()
+            except Exception as exc:
+                raise ValidationAppError(f"Could not retrieve DICOM file: {exc}")
+
+        response = HttpResponse(content, content_type="application/dicom")
+        response["Content-Disposition"] = f'inline; filename="study_{pk}.dcm"'
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+
+class DicomSeriesListView(APIView):
+    """
+    GET /radiology/studies/<id>/series/
+    Returns all DicomSeries (upload bundles) for an ImagingStudy, newest first.
+    Each series includes the full list of file URLs so the viewer can load them.
+    """
+    permission_classes = [IsAuthenticated, RadiologyDepartmentPermission]
+
+    def get(self, request, pk):
+        try:
+            study = ImagingStudy.objects.get(id=pk)
+        except ImagingStudy.DoesNotExist:
+            raise NotFoundError("Imaging study not found.")
+
+        series = (
+            DicomSeries.objects
+            .filter(study=study)
+            .prefetch_related("files")
+            .select_related("uploaded_by")
+            .order_by("-created_at")
+        )
+        return Response(DicomSeriesSerializer(series, many=True).data)
+
+class DicomAnalyzeView(APIView):
+    """
+    POST /radiology/studies/<id>/dicom-analyze/
+
+    Upload one or more DICOM files (multipart field: ``file``, repeatable for
+    multi-slice series) → pydicom extracts pixel slices + acquisition metadata
+    → MedGemma vision model analyses the actual images + patient KG →
+    structured radiology report draft.
+
+    When multiple files are sent the backend samples representative slices
+    evenly across the full set (up to MAX_SLICES total).
+
+    Falls back to the study's stored pacs_url if no file is uploaded.
+    Falls back to metadata-only analysis if pixel extraction fails.
+
+    Returns:
+      { technique, comparison, findings, impression, recommendations,
+        alerts, metadata, aiSource, studyId, raw }
+    """
+    permission_classes = [IsAuthenticated, IsRadiologist | IsAdmin]
+    parser_classes = [MultiPartParser, JSONParser]
+
+    MAX_SLICES = 4
+
+    def post(self, request, pk):
+        from apps.cdss.services.ai_service import AIService
+
+        try:
+            study = ImagingStudy.objects.select_related("order", "patient").get(id=pk)
+        except ImagingStudy.DoesNotExist:
+            raise NotFoundError("Imaging study not found.")
+
+        dicom_files = request.FILES.getlist("file")
+
+        series_id = request.data.get("seriesId") or request.query_params.get("seriesId")
+
+        if not dicom_files and not study.pacs_url and not series_id:
+            latest_series = DicomSeries.objects.filter(study=study).order_by("-created_at").first()
+            if not latest_series or not latest_series.files.exists():
+                raise ValidationAppError(
+                    "No DICOM file provided and no image is stored for this study. "
+                    "Upload a DICOM file first."
+                )
+            series_id = str(latest_series.id)
+
+        try:
+            import pydicom
+
+            if dicom_files:
+                all_raw_bytes = [f.read() for f in dicom_files]
+            elif series_id:
+                try:
+                    target_series = DicomSeries.objects.prefetch_related("files").get(id=series_id, study=study)
+                except DicomSeries.DoesNotExist:
+                    raise ValidationAppError("Series not found for this study.")
+                import urllib.request as urllib_req
+                all_raw_bytes = []
+                for df in target_series.files.order_by("instance_number", "created_at"):
+                    r2 = urllib_req.Request(df.file_url, headers={"User-Agent": "MedHub-Proxy/1.0"})
+                    with urllib_req.urlopen(r2, timeout=30) as resp:
+                        all_raw_bytes.append(resp.read())
+                if not all_raw_bytes:
+                    raise ValidationAppError("No files found in this series.")
+            else:
+                import urllib.request as urllib_req
+                req = urllib_req.Request(
+                    study.pacs_url, headers={"User-Agent": "MedHub-Proxy/1.0"}
+                )
+                with urllib_req.urlopen(req, timeout=30) as resp:
+                    all_raw_bytes = [resp.read()]
+
+        except ValidationAppError:
+            raise
+        except Exception as exc:
+            raise ValidationAppError(f"Could not fetch DICOM file: {exc}")
+
+        try:
+            ds_meta = pydicom.dcmread(io.BytesIO(all_raw_bytes[0]), stop_before_pixels=True)
+            metadata = _extract_dicom_metadata(ds_meta)
+        except Exception as exc:
+            raise ValidationAppError(f"Could not parse DICOM metadata: {exc}")
+
+        pixel_images_b64 = []
+        try:
+            import numpy as np
+            from PIL import Image as PILImage
+            import base64
+
+            all_frames = []
+            for raw_bytes in all_raw_bytes:
+                ds = pydicom.dcmread(io.BytesIO(raw_bytes))
+                pixel_array = ds.pixel_array
+                if pixel_array.ndim == 2:
+                    all_frames.append(pixel_array)
+                elif pixel_array.ndim == 3:
+                    for i in range(pixel_array.shape[0]):
+                        all_frames.append(pixel_array[i])
+
+            total = len(all_frames)
+            if total == 0:
+                frames = []
+            elif total <= self.MAX_SLICES:
+                frames = all_frames
+            else:
+                step = total / self.MAX_SLICES
+                indices = [int(step * i + step * 0.5) for i in range(self.MAX_SLICES)]
+                frames = [all_frames[min(i, total - 1)] for i in indices]
+
+            for frame in frames[:self.MAX_SLICES]:
+                arr = frame.astype(np.float32)
+                wc_str = metadata.get("windowCenter", "")
+                ww_str = metadata.get("windowWidth", "")
+                try:
+                    wc = float(wc_str.split(",")[0]) if wc_str else None
+                    ww = float(ww_str.split(",")[0]) if ww_str else None
+                except (ValueError, AttributeError):
+                    wc, ww = None, None
+
+                if wc is not None and ww is not None and ww > 0:
+                    lo, hi = wc - ww / 2, wc + ww / 2
+                else:
+                    lo, hi = float(arr.min()), float(arr.max())
+
+                if hi > lo:
+                    arr = np.clip((arr - lo) / (hi - lo) * 255, 0, 255).astype(np.uint8)
+                else:
+                    arr = np.zeros_like(arr, dtype=np.uint8)
+
+                img = PILImage.fromarray(arr, mode="L").convert("RGB")
+                img.thumbnail((512, 512), PILImage.LANCZOS)
+
+                buf = io.BytesIO()
+                img.save(buf, format="PNG", optimize=True)
+                pixel_images_b64.append(
+                    base64.b64encode(buf.getvalue()).decode("ascii")
+                )
+
+        except Exception as exc:
+            logger.warning("DICOM pixel extraction failed for study %s: %s", pk, exc)
+            pixel_images_b64 = []
+
+        order = study.order if study.order_id else None
+        modality        = (order.modality        if order else metadata.get("modality",         "")) or ""
+        body_part       = (order.body_part        if order else metadata.get("bodyPartExamined", "")) or ""
+        indication      = ((order.indication or "") if order else "") or ""
+        clinical_history = ((order.clinical_history or "") if order else "") or ""
+
+        try:
+            report_indication = study.report.indication or ""
+        except Exception:
+            report_indication = ""
+        if report_indication and len(report_indication) > len(indication):
+            indication = report_indication
+
+        result = AIService.analyze_dicom_study(
+            patient_uuid=str(study.patient_id),
+            metadata=metadata,
+            modality=modality,
+            body_part=body_part,
+            indication=indication,
+            clinical_history=clinical_history,
+            pixel_images_b64=pixel_images_b64 or None,
+        )
+
+        new_series = None
+        if dicom_files:
+            try:
+                from core.storage import upload_file as _upload_file
+
+                last_series = DicomSeries.objects.filter(study=study).order_by("-series_number").first()
+                next_number = (last_series.series_number + 1) if last_series else 1
+
+                try:
+                    series_uid  = getattr(ds_meta, "SeriesInstanceUID", None)
+                    series_desc = getattr(ds_meta, "SeriesDescription",  None)
+                    instance_num_start = int(getattr(ds_meta, "InstanceNumber", 1) or 1)
+                except Exception:
+                    series_uid = series_desc = None
+                    instance_num_start = 1
+
+                new_series = DicomSeries.objects.create(
+                    study=study,
+                    uploaded_by=request.user if request.user.is_authenticated else None,
+                    series_number=next_number,
+                    series_uid=str(series_uid) if series_uid else None,
+                    description=str(series_desc) if series_desc else None,
+                    modality=modality or None,
+                    body_part=body_part or None,
+                    slice_count=len(dicom_files),
+                )
+
+                first_url = None
+                for idx, f in enumerate(dicom_files):
+                    f.seek(0)
+                    fname = f.name if f.name.lower().endswith(".dcm") else f"{f.name}.dcm"
+                    try:
+                        up = _upload_file(f, "radiology-studies", fname)
+                        DicomFile.objects.create(
+                            series=new_series,
+                            file_url=up["fileUrl"],
+                            file_name=fname,
+                            file_size=getattr(f, "size", None),
+                            instance_number=instance_num_start + idx,
+                        )
+                        if first_url is None:
+                            first_url = up["fileUrl"]
+                    except Exception as file_exc:
+                        logger.warning("Failed to upload DICOM file %s for study %s: %s", fname, pk, file_exc)
+
+                update_fields = ["images_count", "series_count"]
+                study.images_count = (study.images_count or 0) + len(dicom_files)
+                study.series_count = DicomSeries.objects.filter(study=study).count()
+                if first_url and not study.pacs_url:
+                    study.pacs_url = first_url
+                    update_fields.append("pacs_url")
+                study.save(update_fields=update_fields)
+
+            except Exception as exc:
+                logger.warning("DICOM series save failed for study %s: %s", pk, exc)
+
+        write_audit_log(
+            request, AuditAction.READ, "DicomAnalyze", str(pk),
+            details={
+                "patientId": str(study.patient_id),
+                "modality": modality,
+                "slicesSent": len(pixel_images_b64),
+                "seriesId": str(new_series.id) if new_series else None,
+            },
+        )
+        return Response(
+            {
+                **result,
+                "metadata": metadata,
+                "studyId": str(study.id),
+                "slicesSent": len(pixel_images_b64),
+                "seriesId": str(new_series.id) if new_series else None,
+            },
+            status=status.HTTP_200_OK,
+        )
 

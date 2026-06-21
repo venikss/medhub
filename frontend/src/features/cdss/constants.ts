@@ -14,8 +14,6 @@ import type {
   CDSSOverrideReasonCategory, CDSSSourceModule,
 } from "@/types";
 
-// ── Severity ──────────────────────────────────────────────────────────────────
-
 export const SEVERITY_CONFIG: Record<CDSSAlertSeverity, {
   border: string; bg: string; badge: string;
   icon: LucideIcon; iconColor: string; label: string; pill: string;
@@ -49,47 +47,34 @@ export const SEVERITY_CONFIG: Record<CDSSAlertSeverity, {
   },
 };
 
-// ── Recommendation types ───────────────────────────────────────────────────────
-
 export const TYPE_LABELS: Record<CDSSRecommendationType, string> = {
-  // Medication / Safety
   drug_interaction:      "Drug Interaction",
   allergy:               "Allergy Alert",
   dosage_warning:        "Dosage Warning",
   duplicate_therapy:     "Duplicate Therapy",
   contraindication:      "Contraindication",
-  // Order / Guideline
   guideline:             "Clinical Guideline",
   order_set:             "Order Set",
   appropriateness_check: "Appropriateness Check",
-  // Diagnostic / Results
   diagnostic:            "Diagnostic Suggestion",
   abnormal_result:       "Abnormal Result",
   panic_value:           "Panic Value",
   delta_check:           "Delta Check",
   critical_result:       "Critical Result",
-  // Preventive / Screening
   preventive:            "Preventive Care",
   care_gap:              "Care Gap",
   follow_up_reminder:    "Follow-Up Reminder",
-  // Nursing / Deterioration
   deterioration_alert:   "Deterioration Alert",
   overdue_task:          "Overdue Task",
   risk_score:            "Risk Score",
-  // Radiology
   urgent_finding:        "Urgent Finding",
-  // Emergency
   triage_support:        "Triage Support",
   sepsis_alert:          "Sepsis Alert",
   trauma_alert:          "Trauma Alert",
-  // Surgery
   perioperative_warning: "Perioperative Warning",
   checklist_gap:         "Checklist Gap",
-  // Cross-cutting
   care_plan_deviation:   "Care Plan Deviation",
 };
-
-// ── Status ────────────────────────────────────────────────────────────────────
 
 export const STATUS_DISPLAY: Record<CDSSAlertStatus, { label: string; color: string }> = {
   active:       { label: "Active",       color: "text-emerald-600" },
@@ -99,8 +84,6 @@ export const STATUS_DISPLAY: Record<CDSSAlertStatus, { label: string; color: str
   expired:      { label: "Expired",      color: "text-muted-foreground" },
   followed:     { label: "Followed",     color: "text-emerald-600" },
 };
-
-// ── Confidence ────────────────────────────────────────────────────────────────
 
 export const CONFIDENCE_BADGE: Record<CDSSConfidenceLevel, string> = {
   high:     "bg-emerald-500/10 text-emerald-700 border-emerald-400/30",
@@ -115,8 +98,6 @@ export const CONFIDENCE_METER: Record<CDSSConfidenceLevel, {
   moderate: { color: "text-amber-600",   trackColor: "stroke-amber-500",   label: "Moderate Confidence" },
   low:      { color: "text-red-600",     trackColor: "stroke-red-500",     label: "Low Confidence" },
 };
-
-// ── Evidence source ───────────────────────────────────────────────────────────
 
 export const SOURCE_ICONS: Record<CDSSEvidenceSourceType, LucideIcon> = {
   guideline:     BookOpen,
@@ -141,8 +122,6 @@ export const SOURCE_TYPE_LABELS: Record<CDSSEvidenceSourceType, string> = {
   ai_model:      "AI Model",
   ehr_pattern:   "EHR Pattern",
 };
-
-// ── Override / clinician response ─────────────────────────────────────────────
 
 export const OVERRIDE_ACTION_CONFIG: Record<CDSSOverrideAction, {
   label: string; description: string; border: string; icon: LucideIcon;
@@ -179,8 +158,6 @@ export const CATEGORY_LABELS: Record<CDSSOverrideReasonCategory, string> = {
   not_applicable:           "Not Applicable",
   other:                    "Other",
 };
-
-// ── Source module ─────────────────────────────────────────────────────────────
 
 export const MODULE_LABELS: Record<CDSSSourceModule, string> = {
   doctor:    "Doctor",

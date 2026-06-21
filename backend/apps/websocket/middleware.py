@@ -11,7 +11,6 @@ from channels.db import database_sync_to_async
 
 User = get_user_model()
 
-
 @database_sync_to_async
 def _get_user_from_token(token: str):
     try:
@@ -24,7 +23,6 @@ def _get_user_from_token(token: str):
         return User.objects.get(id=user_id)
     except Exception:
         return AnonymousUser()
-
 
 class JWTWebSocketMiddleware:
     """
@@ -51,10 +49,7 @@ class JWTWebSocketMiddleware:
             if token:
                 scope["user"] = await _get_user_from_token(token)
             else:
-                # Deny unauthenticated connections
                 scope["user"] = AnonymousUser()
         return await self.inner(scope, receive, send)
 
-
-# Alias used in config/asgi.py
 JWTAuthMiddleware = JWTWebSocketMiddleware

@@ -12,6 +12,7 @@ import {
   verifyPharmacyPrescription,
   holdPharmacyPrescription,
   rejectPharmacyPrescription,
+  releasePharmacyPrescriptionHold,
   getPharmacyProfile,
   createIntervention,
   createSubstitution,
@@ -146,6 +147,17 @@ export function RxVerificationCard({ rx, token, onVerify, onHold, onReject, clas
       const updated = await rejectPharmacyPrescription(rx.id, notes, token ?? undefined);
       setNotes("");
       onReject?.(updated as PharmacyPrescription);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleRelease = async () => {
+    setLoading("hold");
+    try {
+      const updated = await releasePharmacyPrescriptionHold(rx.id, token ?? undefined);
+      setNotes("");
+      onVerify?.(updated as PharmacyPrescription);
     } finally {
       setLoading(null);
     }
@@ -442,6 +454,47 @@ export function RxVerificationCard({ rx, token, onVerify, onHold, onReject, clas
               {loading === "verify" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
               Verify
             </Button>
+          </div>
+        )}
+
+        {rx.status === "on-hold" && (
+          <div className="rounded-lg border border-amber-300/50 bg-amber-50/60 p-3 space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
+              <Clock className="h-3.5 w-3.5 text-amber-600" />
+              On Hold
+            </div>
+            {((rx as any).holdReason || rx.notes) && (
+              <p className="text-xs text-amber-700">Reason: {(rx as any).holdReason || rx.notes}</p>
+            )}
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs text-emerald-700 border-emerald-500/30 hover:bg-emerald-500/10"
+                disabled={loading !== null}
+                onClick={handleRelease}
+              >
+                {loading === "hold" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                Resume Verification
+              </Button>
+              <Textarea
+                placeholder="Add rejection reason before declining…"
+                rows={2}
+                className="text-xs resize-none flex-1"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs text-red-600 border-red-500/30 hover:bg-red-500/10 shrink-0"
+                disabled={loading !== null || !notes.trim()}
+                onClick={handleReject}
+              >
+                {loading === "reject" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                Decline
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>

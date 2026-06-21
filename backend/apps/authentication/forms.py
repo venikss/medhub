@@ -3,7 +3,6 @@ from django.contrib.auth.forms import ReadOnlyPasswordHashField
 
 from .models import User
 
-
 class UserAdminCreationForm(forms.ModelForm):
     password1 = forms.CharField(label="Password", widget=forms.PasswordInput)
     password2 = forms.CharField(label="Confirm password", widget=forms.PasswordInput)
@@ -39,7 +38,6 @@ class UserAdminCreationForm(forms.ModelForm):
             user.save()
             self.save_m2m()
         return user
-
 
 class UserAdminChangeForm(forms.ModelForm):
     password = ReadOnlyPasswordHashField(

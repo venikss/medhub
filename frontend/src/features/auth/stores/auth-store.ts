@@ -55,7 +55,6 @@ export const useAuthStore = create<AuthState>()(
                         });
                     }
                 } catch {
-                    // Ignore logout transport errors and clear local auth state anyway.
                 } finally {
                     set({
                         user: null,

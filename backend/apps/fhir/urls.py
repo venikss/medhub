@@ -11,14 +11,11 @@ from .views import (
 )
 
 urlpatterns = [
-    # FHIR capability statement (public)
     path("metadata", FhirCapabilityStatementView.as_view(), name="fhir-metadata"),
 
-    # Patient
     path("Patient/<uuid:pk>/", FhirPatientView.as_view(), name="fhir-patient"),
     path("Patient/<uuid:pk>/$everything", FhirPatientEverythingView.as_view(), name="fhir-patient-everything"),
 
-    # Individual resources
     path("Condition/<uuid:pk>/", FhirConditionView.as_view(), name="fhir-condition"),
     path("MedicationRequest/<uuid:pk>/", FhirMedicationRequestView.as_view(), name="fhir-medication-request"),
     path("Observation/<uuid:pk>/", FhirObservationView.as_view(), name="fhir-observation"),

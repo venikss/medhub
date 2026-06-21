@@ -18,7 +18,6 @@ from apps.cdss.models import (
 from apps.cdss.services.graph_service import GraphService
 from apps.patients.models import Patient
 
-
 @dataclass
 class RuleResult:
     source_module: str
@@ -35,7 +34,6 @@ class RuleResult:
     output_kind: str = CDSSOutputKind.ALERT
     snomed_code: str | None = None
     snomed_display: str | None = None
-
 
 class GraphRuleEngineService:
     """

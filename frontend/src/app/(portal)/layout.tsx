@@ -19,19 +19,16 @@ export default function PortalLayout({
     const [hydrated, setHydrated] = useState(false);
     useNotifications();
 
-    // Wait for Zustand persist rehydration before making auth decisions
     useEffect(() => {
         const unsub = useAuthStore.persist.onFinishHydration(() => {
             setHydrated(true);
         });
-        // If already hydrated (e.g. hot reload), set immediately
         if (useAuthStore.persist.hasHydrated()) {
             setHydrated(true);
         }
         return unsub;
     }, []);
 
-    // Validate the stored token against the server on every mount.
     useEffect(() => {
         if (hydrated && isAuthenticated) {
             apiFetch("/auth/me").catch(() => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen, FlaskConical } from "lucide-react";
+import { BookOpen, FlaskConical, Network } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import { AlertBanner } from "@/features/cdss/components/shared/AlertBanner";
 import { RecommendationCard } from "@/features/cdss/components/shared/RecommendationCard";
 import { ExplanationPanel } from "@/features/cdss/components/shared/ExplanationPanel";
 import { EvidenceDrawer } from "@/features/cdss/components/shared/EvidenceDrawer";
-import { ModuleGraphSummary } from "@/features/cdss/components/shared/ModuleGraphSummary";
 import { OverrideReasonDialog } from "@/features/cdss/components/shared/OverrideReasonDialog";
 import type { CDSSRecommendation } from "@/types";
 
@@ -66,16 +65,22 @@ export function LabCDSSPanel({
             </Badge>
           )}
         </div>
-        <Link href={`/cdss/patient/${patientId}`}>
-          <Button variant="ghost" size="sm" className="text-xs h-7 gap-1 text-muted-foreground">
-            <BookOpen className="h-3 w-3" /> All
-          </Button>
-        </Link>
+        <div className="flex items-center gap-1">
+          <Link href={`/cdss/patient/${patientId}/graph`}>
+            <Button variant="ghost" size="sm" className="text-xs h-7 gap-1 text-muted-foreground">
+              <Network className="h-3 w-3" /> KG
+            </Button>
+          </Link>
+          <Link href={`/cdss/patient/${patientId}`}>
+            <Button variant="ghost" size="sm" className="text-xs h-7 gap-1 text-muted-foreground">
+              <BookOpen className="h-3 w-3" /> All
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {cdss.counts.active === 0 ? (
         <div className="p-3 space-y-2">
-          <ModuleGraphSummary patientId={patientId} module="lab" />
           <div className="py-6 text-center">
             <FlaskConical className="h-6 w-6 text-muted-foreground/30 mx-auto mb-2" />
             <p className="text-xs text-muted-foreground">No active laboratory alerts for this patient</p>
@@ -83,8 +88,6 @@ export function LabCDSSPanel({
         </div>
       ) : (
         <div className="p-3 space-y-2">
-          <ModuleGraphSummary patientId={patientId} module="lab" />
-
           {primaryRecs
             .filter((rec) => rec.severity === "critical")
             .map((rec) => (

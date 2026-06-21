@@ -4,7 +4,6 @@ from apps.administration.models import RadiologyCatalogItem
 from apps.authentication.models import UserRole
 from .models import ImagingOrder
 
-
 BODY_PART_CHOICES = [
     ("", "---------"),
     ("head", "Head"),
@@ -33,7 +32,6 @@ LATERALITY_CHOICES = [
     ("bilateral", "Bilateral"),
 ]
 
-
 def build_patient_clinical_summary(patient):
     if not patient:
         return ""
@@ -50,14 +48,12 @@ def build_patient_clinical_summary(patient):
         summary_parts.append("Diagnoses: " + ", ".join(diagnoses))
     return " | ".join(summary_parts)
 
-
 class ImagingOrderAdminForm(forms.ModelForm):
     body_part = forms.ChoiceField(required=False, choices=BODY_PART_CHOICES, label="Body part")
     priority = forms.ChoiceField(required=False, choices=PRIORITY_CHOICES)
     laterality = forms.ChoiceField(required=False, choices=LATERALITY_CHOICES)
     indication = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}), required=False)
     clinical_history = forms.CharField(widget=forms.Textarea(attrs={"rows": 4}), required=False)
-
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -119,12 +115,4 @@ class ImagingOrderAdminForm(forms.ModelForm):
         if not cleaned.get("indication"):
             self.add_error("indication", "Indication is required unless it can be derived from patient context.")
         return cleaned
-
-
-
-
-
-
-
-
 

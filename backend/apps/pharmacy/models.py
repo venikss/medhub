@@ -12,7 +12,6 @@ from django.db import models
 from django.conf import settings
 from core.models import TimeStampedModel
 
-
 class RxStatus(models.TextChoices):
     ORDERED = "ordered", "Ordered"
     PENDING_VERIFICATION = "pending-verification", "Pending Verification"
@@ -23,12 +22,10 @@ class RxStatus(models.TextChoices):
     CANCELLED = "cancelled", "Cancelled"
     RETURNED = "returned", "Returned"
 
-
 class RxSetting(models.TextChoices):
     INPATIENT = "inpatient", "Inpatient"
     OUTPATIENT = "outpatient", "Outpatient"
     DISCHARGE = "discharge", "Discharge"
-
 
 class PharmacyPrescription(TimeStampedModel):
     """Pharmacy view of a prescription — extends doctors.Prescription workflow."""
@@ -66,7 +63,6 @@ class PharmacyPrescription(TimeStampedModel):
     def __str__(self):
         drug = getattr(self.original_prescription, "medication", "Prescription")
         return f"{drug} - {self.patient.full_name} [{self.status}]"
-
 
 class DrugWarning(TimeStampedModel):
     prescription = models.ForeignKey(
@@ -108,12 +104,10 @@ class DrugWarning(TimeStampedModel):
     def __str__(self):
         return f"{self.type} warning - {self.patient.full_name}"
 
-
 class FormularyStatus(models.TextChoices):
     FORMULARY = "formulary", "On Formulary"
     NON_FORMULARY = "non-formulary", "Non-Formulary"
     RESTRICTED = "restricted", "Restricted"
-
 
 class FormularyItem(TimeStampedModel):
     name = models.CharField(max_length=200)
@@ -134,7 +128,6 @@ class FormularyItem(TimeStampedModel):
 
     def __str__(self):
         return f"{self.name} ({self.generic_name or self.drug_class})"
-
 
 class DispenseRecord(TimeStampedModel):
     prescription = models.ForeignKey(
@@ -158,7 +151,6 @@ class DispenseRecord(TimeStampedModel):
     def __str__(self):
         return f"Dispense - {self.patient.full_name} - {self.quantity}"
 
-
 class InterventionType(models.TextChoices):
     THERAPY_CHANGE = "therapy-change", "Therapy Change"
     DOSE_ADJUSTMENT = "dose-adjustment", "Dose Adjustment"
@@ -168,7 +160,6 @@ class InterventionType(models.TextChoices):
     FORMULARY_SUBSTITUTION = "formulary-substitution", "Formulary Substitution"
     OTHER = "other", "Other"
 
-
 class PharmacyIntervention(TimeStampedModel):
     prescription = models.ForeignKey(
         PharmacyPrescription, on_delete=models.CASCADE, related_name="interventions"
@@ -177,9 +168,6 @@ class PharmacyIntervention(TimeStampedModel):
     reason = models.TextField()
     recommendation = models.TextField()
     prescriber_contact = models.CharField(max_length=200)
-    # Fixed: replaced pharmacist_name CharField with pharmacist ForeignKey.
-    # The view calls serializer.save(pharmacist=request.user) so the FK must exist.
-    # Migration: remove pharmacist_name column, add pharmacist_id FK column.
     pharmacist = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -196,7 +184,6 @@ class PharmacyIntervention(TimeStampedModel):
 
     def __str__(self):
         return f"{self.type} - {self.prescription.patient.full_name}"
-
 
 class Refill(TimeStampedModel):
     prescription = models.ForeignKey(
@@ -218,12 +205,10 @@ class Refill(TimeStampedModel):
     def __str__(self):
         return f"Refill - {self.patient.full_name} - {self.quantity}"
 
-
 class SubstitutionStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     APPROVED = "approved", "Approved"
     REJECTED = "rejected", "Rejected"
-
 
 class Substitution(TimeStampedModel):
     prescription = models.ForeignKey(

@@ -13,7 +13,6 @@ from rest_framework import serializers
 from .models import Invoice, Claim, Payment, Denial
 from core.standards import is_valid_cpt_or_local, is_valid_icd10
 
-
 CLAIM_STATUS_TO_API = {
     "draft": "draft",
     "submitted": "submitted",
@@ -82,7 +81,6 @@ DENIAL_REASON_TO_API = {
     "out-of-network": "CO-45",
     "other": "CO-97",
 }
-
 
 class InvoiceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -175,9 +173,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "attendingPhysician": assigned_doctor.get_full_name() if assigned_doctor else (latest_admission.admitting_doctor.get_full_name() if latest_admission and latest_admission.admitting_doctor_id else None),
             "insurancePlan": insurance_plan,
             "chargeItems": charge_items,
-            # Fixed: spec uses `totalCharges`, not `totalAmount`
             "totalCharges": float(data["total_amount"]) if data["total_amount"] else 0,
-            # Keep totalAmount as alias for backward compat with any internal code
             "totalAmount": float(data["total_amount"]) if data["total_amount"] else 0,
             "primaryDiagnosis": data["primary_diagnosis"],
             "primaryDiagnosisCode": insurance_plan.get("primaryDiagnosisCode") or (charge_items[0].get("diagnosisCodes", [None])[0] if charge_items else None),
@@ -196,7 +192,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "createdAt": data["created_at"],
             "updatedAt": data["updated_at"],
         }
-
 
 class ClaimSerializer(serializers.ModelSerializer):
     class Meta:
@@ -257,7 +252,6 @@ class ClaimSerializer(serializers.ModelSerializer):
             "updatedAt": data["updated_at"],
         }
 
-
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
@@ -306,14 +300,12 @@ class PaymentSerializer(serializers.ModelSerializer):
             "checkNumber": data["reference_number"] if data["method"] == "check" else None,
             "eobDate": instance.claim.eob_date.isoformat() if instance.claim_id and instance.claim.eob_date else None,
             "isVoid": data["voided"],
-            # Model field is posted_at (not paid_at) — used correctly here
             "postedAt": data["posted_at"],
             "voided": data["voided"],
             "voidReason": data["void_reason"],
             "voidedAt": data["voided_at"],
             "createdAt": data["created_at"],
         }
-
 
 class DenialSerializer(serializers.ModelSerializer):
     class Meta:

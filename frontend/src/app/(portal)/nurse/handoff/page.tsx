@@ -27,7 +27,6 @@ export default function HandoffPage() {
   const [saving, setSaving] = useState(false);
   const [ackingId, setAckingId] = useState<string | null>(null);
 
-  // Form state
   const [formPatient, setFormPatient] = useState("");
   const [formShiftType, setFormShiftType] = useState<string>("day");
   const [formSituation, setFormSituation] = useState("");

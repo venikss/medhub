@@ -396,10 +396,6 @@ export function listHandoffs(query: { shiftType?: string; shiftDate?: string } =
   );
 }
 
-// ---------------------------------------------------------------------------
-// Medication Administration (MAR)
-// ---------------------------------------------------------------------------
-
 export function administerMedication(
   marEntryId: string,
   payload: { barcode?: string; notes?: string },
@@ -425,10 +421,6 @@ export function updateMARStatus(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Tasks
-// ---------------------------------------------------------------------------
-
 export function completeTask(
   taskId: string,
   completionNotes?: string,
@@ -441,20 +433,12 @@ export function completeTask(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Handoff acknowledgement
-// ---------------------------------------------------------------------------
-
 export function acknowledgeHandoff(handoffId: string, token?: string | null) {
   return apiFetch(`/nurses/handoffs/${handoffId}/acknowledge/`, {
     method: "POST",
     token: token ?? undefined,
   });
 }
-
-// ---------------------------------------------------------------------------
-// Create Handoff
-// ---------------------------------------------------------------------------
 
 export function createHandoff(
   payload: {
@@ -482,10 +466,6 @@ export function createHandoff(
     }),
   });
 }
-
-// ---------------------------------------------------------------------------
-// Create Vitals
-// ---------------------------------------------------------------------------
 
 export function createVitals(
   payload: {

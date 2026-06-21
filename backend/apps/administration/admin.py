@@ -49,13 +49,11 @@ class SystemSettingAdmin(admin.ModelAdmin):
     readonly_fields = ["updated_at"]
     autocomplete_fields = ["updated_by"]
 
-
 @admin.register(RolePermission)
 class RolePermissionAdmin(admin.ModelAdmin):
     list_display = ["role", "resource", "action", "allowed"]
     list_filter = ["role", "allowed"]
     search_fields = ["role", "resource", "action"]
-
 
 @admin.register(LabCatalogItem)
 class LabCatalogItemAdmin(admin.ModelAdmin):
@@ -63,13 +61,11 @@ class LabCatalogItemAdmin(admin.ModelAdmin):
     list_filter = ["category", "is_active"]
     search_fields = ["code", "name", "cpt_code"]
 
-
 @admin.register(RadiologyCatalogItem)
 class RadiologyCatalogItemAdmin(admin.ModelAdmin):
     list_display = ["code", "name", "modality", "body_part", "with_contrast", "is_active"]
     list_filter = ["modality", "with_contrast", "is_active"]
     search_fields = ["code", "name", "cpt_code", "body_part"]
-
 
 @admin.register(ServiceCatalogItem)
 class ServiceCatalogItemAdmin(admin.ModelAdmin):

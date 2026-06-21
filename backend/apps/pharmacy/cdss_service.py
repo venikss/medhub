@@ -15,7 +15,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 def _map_ddi_severity_to_warning(severity: str) -> str:
     """Map KG DDI severity to DrugWarning.severity choices."""
     return {
@@ -25,7 +24,6 @@ def _map_ddi_severity_to_warning(severity: str) -> str:
         "minor": "info",
     }.get(severity, "moderate")
 
-
 def _map_warning_severity_to_cdss(severity: str) -> str:
     return {
         "contraindicated": "critical",
@@ -34,12 +32,7 @@ def _map_warning_severity_to_cdss(severity: str) -> str:
         "info": "info",
     }.get(severity, "warning")
 
-
 class PharmacyCDSSService:
-
-    # ------------------------------------------------------------------
-    # 1. KG Drug Safety Check (read-only)
-    # ------------------------------------------------------------------
 
     @staticmethod
     def run_kg_safety_check(
@@ -97,10 +90,6 @@ class PharmacyCDSSService:
             "total_alerts": len(ddi_alerts) + len(allergy_alerts) + len(risk_alerts),
         }
 
-    # ------------------------------------------------------------------
-    # 2. Persist alerts as DrugWarning + CDSS recommendations
-    # ------------------------------------------------------------------
-
     @staticmethod
     def persist_kg_safety_alerts(
         patient_id,
@@ -156,11 +145,10 @@ class PharmacyCDSSService:
                     target_roles=rec.target_roles,
                 )
             except Exception:
-                pass  # WebSocket is non-critical
+                pass
 
         created: list = []
 
-        # DDI alerts
         for alert in safety_check["ddi_alerts"]:
             meds = sorted([alert["drug_a"], alert["drug_b"]])
             if DrugWarning.objects.filter(
@@ -188,7 +176,6 @@ class PharmacyCDSSService:
             _fire_cdss(w)
             created.append(w)
 
-        # Allergy cross-reactivity alerts
         for alert in safety_check["allergy_alerts"]:
             if DrugWarning.objects.filter(
                 patient_id=patient_id,
@@ -214,7 +201,6 @@ class PharmacyCDSSService:
             _fire_cdss(w)
             created.append(w)
 
-        # Risk group alerts
         for alert in safety_check["risk_group_alerts"]:
             meds = sorted(alert.get("involved_drugs", []))
             if DrugWarning.objects.filter(
@@ -248,10 +234,6 @@ class PharmacyCDSSService:
             len(created), patient_id,
         )
         return created
-
-    # ------------------------------------------------------------------
-    # 3. Pharmacy AI Consult (MedGemma + KG)
-    # ------------------------------------------------------------------
 
     @staticmethod
     def ai_consult(

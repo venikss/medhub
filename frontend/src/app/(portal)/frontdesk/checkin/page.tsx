@@ -33,7 +33,6 @@ function CheckInContent() {
     const [patientAppts, setPatientAppts] = useState<Appointment[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [checkInError, setCheckInError] = useState<string | null>(null);
-    // Admission fields
     const [admitDoctorId, setAdmitDoctorId] = useState("");
     const [admitDeptId, setAdmitDeptId] = useState("");
     const [admitWardId, setAdmitWardId] = useState("");
@@ -113,11 +112,9 @@ function CheckInContent() {
                     },
                     token,
                 );
-                // Create or update admission if the user filled admission fields
                 if (showAdmit) {
                     const existingAdmission = (checkInRes as Record<string, unknown>)?.activeAdmission as { id?: string } | null;
                     if (existingAdmission?.id) {
-                        // Patient already has an active admission — update it with doctor/dept
                         const updatePayload: Record<string, unknown> = {};
                         if (admitDoctorId) updatePayload.admittingDoctor = admitDoctorId;
                         if (admitDeptId) updatePayload.departmentId = admitDeptId;
@@ -130,7 +127,6 @@ function CheckInContent() {
                             }
                         }
                     } else {
-                        // No active admission — create a new one
                         const payload: Record<string, unknown> = {
                             patientId: selectedPatient.id,
                             type: admitType,
@@ -315,14 +311,14 @@ function CheckInContent() {
                                 </div>
                             )}
 
-                            {selectedPatient.allergies && selectedPatient.allergies.length > 0 && (
+                            {(() => { const al = Array.isArray(selectedPatient.allergies) ? selectedPatient.allergies : typeof selectedPatient.allergies === "string" && selectedPatient.allergies ? selectedPatient.allergies.split(",").map((s: string) => s.trim()).filter(Boolean) : []; return al.length > 0 ? (
                                 <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
                                     <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
                                     <p className="text-sm text-red-800 dark:text-red-300">
-                                        Allergies: <strong>{selectedPatient.allergies.map((a: any) => typeof a === "string" ? a : a.substance ?? a.reaction ?? JSON.stringify(a)).join(", ")}</strong>
+                                        Allergies: <strong>{al.map((a: any) => typeof a === "string" ? a : a.substance ?? a.reaction ?? JSON.stringify(a)).join(", ")}</strong>
                                     </p>
                                 </div>
-                            )}
+                            ) : null; })()}
 
                             {/* Insurance verification */}
                             {selectedPatient.insurance && (

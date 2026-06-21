@@ -9,7 +9,6 @@ from django.db import models
 
 from core.utils import generate_employee_id
 
-
 class UserRole(models.TextChoices):
     ADMIN = "admin", "Admin"
     DOCTOR = "doctor", "Doctor"
@@ -21,13 +20,11 @@ class UserRole(models.TextChoices):
     FRONT_DESK = "front_desk", "Front Desk"
     PATIENT = "patient", "Patient"
 
-
 class UserStatus(models.TextChoices):
     ACTIVE = "active", "Active"
     INACTIVE = "inactive", "Inactive"
     SUSPENDED = "suspended", "Suspended"
     PENDING = "pending", "Pending"
-
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -46,7 +43,6 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("status", UserStatus.ACTIVE)
         return self.create_user(email, password, **extra_fields)
-
 
 class User(AbstractBaseUser, PermissionsMixin):
     """
@@ -112,7 +108,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         if not self.employee_id and self.role != UserRole.PATIENT:
             self.employee_id = generate_employee_id(self.role)
         super().save(*args, **kwargs)
-
 
 class RefreshTokenRecord(models.Model):
     """Track issued refresh tokens for invalidation and rotation."""

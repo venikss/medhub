@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, ExternalLink } from "lucide-react";
+import { Search, ExternalLink, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ export default function WorklistPage() {
   const [studies, setStudies] = useState<ImagingStudy[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [priors, setPriors] = useState<PriorStudy[]>([]);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,11 +78,11 @@ export default function WorklistPage() {
 
   async function handleAdvanceStatus(newStatus: string) {
     if (!selected) return;
+    setStatusError(null);
     try {
       const updated = await updateStudyStatus(selected.id, newStatus, token ?? undefined);
       setStudies((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
 
-      // When advancing to "reading", auto-create a draft report and navigate
       if (newStatus === "reading") {
         try {
           const report = await createRadiologyReport(
@@ -90,14 +91,13 @@ export default function WorklistPage() {
           );
           router.push(`/radiology/reports?reportId=${report.id}`);
         } catch {
-          // Report may already exist; navigate using the study's existing reportId
           if (updated.reportId) {
             router.push(`/radiology/reports?reportId=${updated.reportId}`);
           }
         }
       }
     } catch (err: any) {
-      alert(err?.message ?? "Failed to update status");
+      setStatusError(err?.message ?? "Failed to update status.");
     }
   }
 
@@ -188,7 +188,7 @@ export default function WorklistPage() {
                 key={study.id}
                 study={study}
                 selected={selected?.id === study.id}
-                onClick={() => setSelectedId(study.id)}
+                onClick={() => { setSelectedId(study.id); setStatusError(null); }}
               />
             ))
           )}
@@ -259,7 +259,7 @@ export default function WorklistPage() {
                   {nextAction && (
                     <Button
                       className="flex-1 gap-2"
-                      onClick={() => void handleAdvanceStatus(nextAction.next)}
+                      onClick={() => { setStatusError(null); void handleAdvanceStatus(nextAction.next); }}
                     >
                       {nextAction.label}
                     </Button>
@@ -274,6 +274,11 @@ export default function WorklistPage() {
                     Open in PACS Viewer (Demo)
                   </Button>
                 </div>
+                {statusError && (
+                  <p className="flex items-center gap-1 text-xs text-destructive">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />{statusError}
+                  </p>
+                )}
 
                 {visiblePriors.length > 0 && (
                   <>

@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/atoms/StatusBadge";
-import { createAdmission, getFrontDeskAdmissionLookups, getFrontDeskPatientSummary } from "@/features/frontdesk/api";
+import { createAdmission, getFrontDeskAdmissionLookups, getFrontDeskPatientSummary, reassignDoctor } from "@/features/frontdesk/api";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import type { Admission, AdminDepartment, AdminUser, BedInfo, Insurance, Ward } from "@/types";
 
@@ -27,7 +27,6 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Admit dialog
   const [admitDialog, setAdmitDialog] = useState(false);
   const [admitType, setAdmitType] = useState<string>("inpatient");
   const [admitReason, setAdmitReason] = useState("");
@@ -41,9 +40,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const [wards, setWards] = useState<Ward[]>([]);
   const [admitBeds, setAdmitBeds] = useState<BedInfo[]>([]);
 
-  // Alert dialog
   const [alertDialog, setAlertDialog] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: "", message: "" });
   const showAlert = useCallback((title: string, message: string) => setAlertDialog({ open: true, title, message }), []);
+
+  const [reassignDialog, setReassignDialog] = useState(false);
+  const [reassignDoctorId, setReassignDoctorId] = useState("");
+  const [reassignSubmitting, setReassignSubmitting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,6 +126,39 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     const selectedDoctor = doctors.find((doctor) => doctor.id === admitDoctorId);
     if (selectedDoctor?.departmentId && selectedDoctor.departmentId !== value) {
       setAdmitDoctorId("");
+    }
+  }
+
+  async function handleOpenReassign() {
+    if (!token) return;
+    setReassignDoctorId(patient.assignedDoctor ?? "");
+    setReassignDialog(true);
+    if (doctors.length === 0) {
+      void getFrontDeskAdmissionLookups({}, token)
+        .then((lookup) => {
+          setDoctors(lookup.doctors);
+          setDepartments(lookup.departments);
+          setWards(lookup.wards);
+          setAdmitBeds(lookup.beds);
+        })
+        .catch((error) => {
+          showAlert("Lookup Error", error instanceof Error ? error.message : "We couldn't load the doctors list.");
+        });
+    }
+  }
+
+  async function submitReassign() {
+    if (!token || reassignSubmitting) return;
+    try {
+      setReassignSubmitting(true);
+      const updated = await reassignDoctor(patient.id, reassignDoctorId || null, token);
+      setSummary((prev) => prev ? { ...prev, patient: { ...prev.patient, ...updated } } : prev);
+      setReassignDialog(false);
+      showAlert("Doctor Reassigned", `${patient.firstName} ${patient.lastName} is now assigned to ${updated.assignedDoctorName ?? "no doctor"}.`);
+    } catch (error) {
+      showAlert("Error", error instanceof Error ? error.message : "We couldn't reassign the doctor.");
+    } finally {
+      setReassignSubmitting(false);
     }
   }
 
@@ -210,6 +245,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="flex gap-2">
           <Link href={`/frontdesk/checkin?patientId=${patient.id}`}><Button variant="outline" size="sm">Check In</Button></Link>
+          <Button variant="outline" size="sm" onClick={() => void handleOpenReassign()}>Reassign Doctor</Button>
           <Button size="sm" onClick={() => void handleAdmitPatient()} disabled={admitSubmitting}>
             {admitSubmitting ? "Admitting..." : "Admit Patient"}
           </Button>
@@ -225,6 +261,50 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           </DialogHeader>
           <DialogFooter>
             <Button onClick={() => setAlertDialog((p) => ({ ...p, open: false }))}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reassign Doctor Dialog */}
+      <Dialog open={reassignDialog} onOpenChange={setReassignDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reassign Doctor</DialogTitle>
+            <DialogDescription>Change the assigned doctor for {patient.firstName} {patient.lastName}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <div className="space-y-2">
+              <Label>Assigned Doctor</Label>
+              <Select value={reassignDoctorId} onValueChange={setReassignDoctorId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a doctor...">
+                    {reassignDoctorId ? (doctors.find((d) => d.id === reassignDoctorId) ? `${doctors.find((d) => d.id === reassignDoctorId)!.firstName} ${doctors.find((d) => d.id === reassignDoctorId)!.lastName}` : patient.assignedDoctorName) : "No doctor assigned"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">— Unassign —</SelectItem>
+                  {doctors.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{d.firstName} {d.lastName}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {d.specialization}{d.specialization && " · "}{d.activePatientCount ?? 0} active {d.activePatientCount === 1 ? "patient" : "patients"}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {patient.assignedDoctorName && (
+                <p className="text-[11px] text-muted-foreground">Currently: {patient.assignedDoctorName}</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReassignDialog(false)}>Cancel</Button>
+            <Button onClick={() => void submitReassign()} disabled={reassignSubmitting}>
+              {reassignSubmitting ? "Saving..." : "Reassign"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -366,7 +446,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                   <div>
                     <span className="text-muted-foreground text-xs block mb-1.5">Allergies</span>
                     <div className="flex flex-wrap gap-1">
-                      {patient.allergies.map((allergy: unknown, i: number) => {
+                      {(Array.isArray(patient.allergies) ? patient.allergies : typeof patient.allergies === "string" && patient.allergies ? patient.allergies.split(",").map((s: string) => s.trim()).filter(Boolean) : []).map((allergy: unknown, i: number) => {
                         const normalized = allergy as string | { substance?: string; reaction?: string };
                         const label = typeof normalized === "string" ? normalized : normalized.substance ?? normalized.reaction ?? JSON.stringify(normalized);
                         return <Badge key={i} variant="destructive" className="text-xs">{label}</Badge>;

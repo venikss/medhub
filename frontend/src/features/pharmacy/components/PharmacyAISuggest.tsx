@@ -122,7 +122,6 @@ export function PharmacyAISuggest({
   const [error, setError] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<ActionKey>(null);
 
-  // Per-action form state
   const [interventionType, setInterventionType] = useState("other");
   const [interventionReason, setInterventionReason] = useState("");
   const [interventionRec, setInterventionRec] = useState("");
@@ -137,7 +136,6 @@ export function PharmacyAISuggest({
   const rejectState = useActionState();
   const subState = useActionState();
   const verifyState = useActionState();
-  // Per-card substitution loading state (keyed by index)
   const [subCardLoading, setSubCardLoading] = useState<Record<number, "loading" | "done" | "error">>({});
 
   async function handleAnalyse() {
@@ -149,7 +147,6 @@ export function PharmacyAISuggest({
         sig: rx.notes ?? "", indication: "",
       }, token);
       setResult(data);
-      // Pre-fill forms from AI output
       setInterventionType(inferInterventionType(data));
       setInterventionReason(
         [data.interactions, data.allergy_risks].filter(Boolean).join("\n\n").slice(0, 500)

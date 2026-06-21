@@ -1,7 +1,6 @@
 ﻿from django.contrib import admin
 from apps.authentication.models import UserRole
 
-
 class RoleRestrictedAdminMixin:
     required_role = None
     view_roles = ()
@@ -27,7 +26,6 @@ class RoleRestrictedAdminMixin:
 
     def has_delete_permission(self, request, obj=None):
         return self._can_edit(request)
-
 
 from .models import Specimen, Accession, LabPanel, LabTestResult, LabReport, CriticalValue
 
@@ -114,7 +112,4 @@ class LabReportAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
         if obj.panel_id and not obj.patient_id:
             obj.patient = obj.panel.patient
         super().save_model(request, obj, form, change)
-
-
-
 

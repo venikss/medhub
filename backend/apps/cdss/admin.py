@@ -9,7 +9,6 @@ from .models import (
     MedicalOntologyMapping,
 )
 
-
 @admin.register(CDSSConsultRequest)
 class CDSSConsultRequestAdmin(admin.ModelAdmin):
     list_display = ["patient", "requested_by", "status", "created_at", "answered_at"]
@@ -98,14 +97,12 @@ class CDSSOverrideRecordAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-
 @admin.register(MedicalOntologyConcept)
 class MedicalOntologyConceptAdmin(admin.ModelAdmin):
     list_display = ["code_system", "code", "display", "domain", "is_active"]
     list_filter = ["code_system", "domain", "is_active"]
     search_fields = ["code", "display", "normalized_display"]
     readonly_fields = ["created_at", "updated_at"]
-
 
 @admin.register(MedicalOntologyMapping)
 class MedicalOntologyMappingAdmin(admin.ModelAdmin):

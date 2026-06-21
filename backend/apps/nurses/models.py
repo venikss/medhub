@@ -7,7 +7,6 @@ from django.db import models
 from django.conf import settings
 from core.models import TimeStampedModel
 
-
 class Vitals(TimeStampedModel):
     patient = models.ForeignKey(
         "patients.Patient", on_delete=models.CASCADE, related_name="vitals"
@@ -18,8 +17,8 @@ class Vitals(TimeStampedModel):
     temperature = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     spo2 = models.PositiveIntegerField(null=True, blank=True)
     respiratory_rate = models.PositiveIntegerField(null=True, blank=True)
-    pain_score = models.PositiveIntegerField(null=True, blank=True)  # 0-10
-    gcs = models.PositiveIntegerField(null=True, blank=True)  # Glasgow Coma Scale
+    pain_score = models.PositiveIntegerField(null=True, blank=True)
+    gcs = models.PositiveIntegerField(null=True, blank=True)
     news2_score = models.PositiveIntegerField(null=True, blank=True)
     is_admission_vitals = models.BooleanField(
         default=False,
@@ -41,11 +40,9 @@ class Vitals(TimeStampedModel):
     def __str__(self):
         return f"Vitals - {self.patient.full_name} - {self.recorded_at:%Y-%m-%d %H:%M}"
 
-
 class IODirection(models.TextChoices):
     INTAKE = "intake", "Intake"
     OUTPUT = "output", "Output"
-
 
 class IOType(models.TextChoices):
     ORAL = "oral", "Oral"
@@ -58,7 +55,6 @@ class IOType(models.TextChoices):
     DRAIN = "drain", "Drain"
     STOOL = "stool", "Stool"
     BLOOD_LOSS = "blood-loss", "Blood Loss"
-
 
 class IntakeOutput(TimeStampedModel):
     patient = models.ForeignKey(
@@ -79,12 +75,11 @@ class IntakeOutput(TimeStampedModel):
     def __str__(self):
         return f"{self.direction.title()} - {self.patient.full_name} - {self.amount_ml} mL"
 
-
 class PainAssessment(TimeStampedModel):
     patient = models.ForeignKey(
         "patients.Patient", on_delete=models.CASCADE, related_name="pain_assessments"
     )
-    score = models.PositiveIntegerField()  # 0-10
+    score = models.PositiveIntegerField()
     location = models.CharField(max_length=200)
     quality = models.CharField(max_length=200)
     intervention = models.TextField(blank=True, null=True)
@@ -99,7 +94,6 @@ class PainAssessment(TimeStampedModel):
     def __str__(self):
         return f"Pain {self.score}/10 - {self.patient.full_name}"
 
-
 class MARStatus(models.TextChoices):
     SCHEDULED = "scheduled", "Scheduled"
     GIVEN = "given", "Given"
@@ -107,7 +101,6 @@ class MARStatus(models.TextChoices):
     REFUSED = "refused", "Refused"
     MISSED = "missed", "Missed"
     NOT_APPLICABLE = "not-applicable", "Not Applicable"
-
 
 class MAREntry(TimeStampedModel):
     """Medication Administration Record entry."""
@@ -135,14 +128,12 @@ class MAREntry(TimeStampedModel):
     def __str__(self):
         return f"MAR - {self.patient.full_name} - {self.prescription.medication}"
 
-
 class NoteCategory(models.TextChoices):
     ASSESSMENT = "assessment", "Assessment"
     INTERVENTION = "intervention", "Intervention"
     EDUCATION = "education", "Education"
     COMMUNICATION = "communication", "Communication"
     GENERAL = "general", "General"
-
 
 class NursingNote(TimeStampedModel):
     patient = models.ForeignKey(
@@ -153,7 +144,7 @@ class NursingNote(TimeStampedModel):
     )
     category = models.CharField(max_length=30, choices=NoteCategory.choices)
     content = models.TextField()
-    edit_deadline = models.DateTimeField()  # created_at + 4 hours
+    edit_deadline = models.DateTimeField()
 
     class Meta:
         db_table = "nursing_notes"
@@ -162,14 +153,12 @@ class NursingNote(TimeStampedModel):
     def __str__(self):
         return f"{self.category.title()} note - {self.patient.full_name}"
 
-
 class TaskStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     IN_PROGRESS = "in-progress", "In Progress"
     COMPLETED = "completed", "Completed"
     CANCELLED = "cancelled", "Cancelled"
     OVERDUE = "overdue", "Overdue"
-
 
 class Task(TimeStampedModel):
     patient = models.ForeignKey(
@@ -204,7 +193,6 @@ class Task(TimeStampedModel):
     def __str__(self):
         return f"{self.type} - {self.patient.full_name}"
 
-
 class WoundType(models.TextChoices):
     PRESSURE_INJURY = "pressure-injury", "Pressure Injury"
     SURGICAL = "surgical", "Surgical"
@@ -213,7 +201,6 @@ class WoundType(models.TextChoices):
     VASCULAR = "vascular", "Vascular"
     MOISTURE_ASSOCIATED = "moisture-associated", "Moisture Associated"
     OTHER = "other", "Other"
-
 
 class Wound(TimeStampedModel):
     patient = models.ForeignKey(
@@ -236,12 +223,10 @@ class Wound(TimeStampedModel):
     def __str__(self):
         return f"{self.type} - {self.patient.full_name}"
 
-
 class ShiftType(models.TextChoices):
     DAY = "day", "Day"
     EVENING = "evening", "Evening"
     NIGHT = "night", "Night"
-
 
 class Handoff(TimeStampedModel):
     """SBAR handoff report."""
@@ -274,7 +259,6 @@ class Handoff(TimeStampedModel):
 
     def __str__(self):
         return f"Handoff - {self.patient.full_name} - {self.shift_date}"
-
 
 class DischargeChecklistItem(TimeStampedModel):
     patient = models.ForeignKey(

@@ -13,7 +13,6 @@ from apps.patients.models import Gender, Patient, PatientStatus
 from apps.pharmacy.models import FormularyItem
 from apps.pharmacy.serializers import FormularyItemSerializer
 
-
 class OntologyMedicationSerializationTests(TestCase):
     def setUp(self):
         MedicalOntologyConcept.objects.create(
@@ -75,7 +74,6 @@ class OntologyMedicationSerializationTests(TestCase):
         self.assertEqual(data["genericName"], "Acetaminophen")
         self.assertEqual(data["displayMedicationName"], "Paracetamol 500 mg Tablet")
 
-
 class GraphSummaryFormattingTests(TestCase):
     def test_patient_module_graph_summary_includes_codes_in_strings(self):
         original = GraphService.get_patient_structured_snapshot
@@ -99,7 +97,6 @@ class GraphSummaryFormattingTests(TestCase):
         self.assertIn("SNOMED 44054006", joined)
         self.assertIn("RxNorm 860975", joined)
         self.assertIn("LOINC 2823-3", joined)
-
 
 class GraphRuleEngineMedicationSafetyTests(TestCase):
     def _snapshot(self, *, diagnoses: list[str], meds: list[str], labs: list[tuple[str, str]]):

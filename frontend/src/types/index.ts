@@ -1,4 +1,3 @@
-// User roles for the virtual hospital
 export enum UserRole {
   ADMIN = "admin",
   DOCTOR = "doctor",
@@ -28,7 +27,7 @@ export type Priority = "low" | "normal" | "high" | "urgent" | "stat";
 
 export interface Patient {
   id: string;
-  mrn: string; // Medical Record Number
+  mrn: string;
   firstName: string;
   lastName: string;
   fullName?: string;
@@ -44,6 +43,7 @@ export interface Patient {
   insuranceId?: string;
   admissionDate?: string;
   assignedDoctor?: string;
+  assignedDoctorName?: string;
   ward?: string;
   roomNumber?: string;
 }
@@ -57,7 +57,7 @@ export interface Appointment {
   department: string;
   date: string;
   time: string;
-  duration: number; // minutes
+  duration: number;
   status: AppointmentStatus;
   type: "consultation" | "follow-up" | "procedure" | "telemedicine";
   notes?: string;
@@ -109,8 +109,6 @@ export interface Department {
   activePatients: number;
   description?: string;
 }
-
-// ── ADT / Front Desk Types ──────────────────────────────────────────
 
 export interface EmergencyContact {
   name: string;
@@ -221,7 +219,7 @@ export interface QueueEntry {
   status: QueueStatus;
   waitingSince: string;
   window?: string;
-  estimatedWait?: number; // minutes
+  estimatedWait?: number;
 }
 
 export interface ConsentDocument {
@@ -237,23 +235,21 @@ export interface ConsentDocument {
 export interface DuplicateCandidate {
   patientA: Pick<Patient, "id" | "mrn" | "firstName" | "lastName" | "dateOfBirth" | "phone">;
   patientB: Pick<Patient, "id" | "mrn" | "firstName" | "lastName" | "dateOfBirth" | "phone">;
-  matchScore: number; // 0–100
+  matchScore: number;
   matchReasons: string[];
 }
-
-// ── Doctor Portal Types ─────────────────────────────────────────────
 
 export type DiagnosisType = "primary" | "secondary" | "admitting" | "differential";
 
 export interface Diagnosis {
   id: string;
   patientId: string;
-  code: string; // ICD-10
+  code: string;
   description: string;
   type: DiagnosisType;
   diagnosedAt: string;
   diagnosedBy: string;
-  status: "active" | "resolved" | "ruled-out";
+  status: "active" | "resolved" | "chronic" | "suspected";
 }
 
 export type EncounterStatus = "in-progress" | "completed" | "signed" | "amended";
@@ -279,7 +275,7 @@ export type ProcedureStatus = "scheduled" | "in-progress" | "completed" | "cance
 export interface Procedure {
   id: string;
   patientId: string;
-  code: string; // CPT
+  code: string;
   name: string;
   scheduledDate: string;
   performedDate?: string;
@@ -315,7 +311,7 @@ export interface Prescription {
   frequency: string;
   quantity: number;
   refills: number;
-  sig: string; // directions
+  sig: string;
   prescribedBy: string;
   prescribedAt: string;
   startDate: string;
@@ -357,8 +353,6 @@ export interface ResultItem {
   notes?: string;
 }
 
-// ── Ward / Nursing Portal Types ─────────────────────────────────────
-
 export interface VitalEntry {
   id: string;
   patientId: string;
@@ -367,12 +361,12 @@ export interface VitalEntry {
   systolic: number;
   diastolic: number;
   heartRate: number;
-  temperature: number; // °F
+  temperature: number;
   spo2: number;
   respiratoryRate: number;
   news2Score?: number;
-  painScore?: number; // 0-10
-  gcs?: number; // Glasgow Coma Scale 3-15
+  painScore?: number;
+  gcs?: number;
   recordedBy: string;
   notes?: string;
 }
@@ -387,7 +381,7 @@ export interface IntakeOutput {
   timestamp: string;
   direction: IODirection;
   type: IOType;
-  amount: number; // mL
+  amount: number;
   recordedBy: string;
   notes?: string;
 }
@@ -396,7 +390,7 @@ export interface PainEntry {
   id: string;
   patientId: string;
   timestamp: string;
-  score: number; // 0-10
+  score: number;
   location: string;
   quality: "sharp" | "dull" | "burning" | "throbbing" | "aching" | "stabbing";
   intervention?: string;
@@ -494,8 +488,6 @@ export interface DischargeChecklistItem {
   completedAt?: string;
   notes?: string;
 }
-
-// ── Laboratory / LIS Portal Types ───────────────────────────────────
 
 export type SpecimenType = "blood" | "serum" | "plasma" | "urine" | "csf" | "stool" | "swab" | "tissue" | "other";
 export type SpecimenStatus = "ordered" | "collected" | "in-transit" | "received" | "processing" | "analyzed" | "resulted" | "rejected";
@@ -618,8 +610,6 @@ export interface LabReport {
   criticalNotifiedAt?: string;
 }
 
-// ── Pharmacy Portal Types ───────────────────────────────────────────
-
 export type RxStatus = "ordered" | "pending-verification" | "verified" | "dispensing" | "dispensed" | "on-hold" | "cancelled" | "returned";
 export type RxSetting = "inpatient" | "outpatient" | "discharge";
 export type WarningSeverity = "info" | "moderate" | "severe" | "contraindicated";
@@ -643,6 +633,7 @@ export interface PharmacyPrescription {
   status: RxStatus;
   prescribedBy: string;
   prescribedAt: string;
+  encounterId?: string;
   verifiedBy?: string;
   verifiedAt?: string;
   dispensedBy?: string;
@@ -753,8 +744,6 @@ export interface SubstitutionRequest {
   approvedAt?: string;
   costSavings?: number;
 }
-
-// ── Radiology / RIS-PACS Portal Types ──────────────────────────────
 
 export type ImagingModality = "XR" | "CT" | "MRI" | "US" | "NM" | "PET" | "DEXA" | "FLUORO" | "MAMMO";
 
@@ -911,6 +900,28 @@ export interface PriorStudy {
   pacsUrl?: string;
 }
 
+export interface DicomFile {
+  id: string;
+  fileUrl: string;
+  fileName: string;
+  fileSize?: number;
+  instanceNumber?: number;
+}
+
+export interface DicomSeries {
+  id: string;
+  studyId: string;
+  seriesNumber: number;
+  seriesUid?: string;
+  description?: string;
+  modality?: string;
+  bodyPart?: string;
+  sliceCount: number;
+  uploadedAt: string;
+  uploadedByName?: string;
+  files: DicomFile[];
+}
+
 export interface RadiologyStats {
   pendingOrders: number;
   protocoled: number;
@@ -922,10 +933,6 @@ export interface RadiologyStats {
   pendingCritical: number;
   statOrders: number;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BILLING / REVENUE CYCLE
-// ─────────────────────────────────────────────────────────────────────────────
 
 export type BillingInvoiceStatus =
   | "draft"
@@ -958,18 +965,18 @@ export type PaymentMethod =
   | "wire";
 
 export type DenialReasonCode =
-  | "CO-4"   // Late filing
-  | "CO-11"  // Diagnosis inconsistent
-  | "CO-15"  // Authorization required
-  | "CO-18"  // Duplicate claim
-  | "CO-22"  // Coordination of benefits
-  | "CO-29"  // Time limit expired
-  | "CO-45"  // Contractual obligation
-  | "CO-50"  // Medical necessity
-  | "CO-97"  // Payment included in allowance for another service
-  | "PR-1"   // Deductible
-  | "PR-2"   // Coinsurance
-  | "PR-3";  // Co-payment
+  | "CO-4"
+  | "CO-11"
+  | "CO-15"
+  | "CO-18"
+  | "CO-22"
+  | "CO-29"
+  | "CO-45"
+  | "CO-50"
+  | "CO-97"
+  | "PR-1"
+  | "PR-2"
+  | "PR-3";
 
 export type DenialStatus = "pending_appeal" | "appealed" | "upheld" | "overturned" | "resubmitted" | "written_off";
 
@@ -1011,7 +1018,7 @@ export interface ChargeItem {
   quantity: number;
   unitPrice: number;
   totalCharge: number;
-  diagnosisCodes: string[];     // ICD-10 codes
+  diagnosisCodes: string[];
   serviceDate: string;
   department: string;
   provider: string;
@@ -1083,7 +1090,7 @@ export interface Payment {
   patientName: string;
   amount: number;
   method: PaymentMethod;
-  payer: string;                // "Patient" | insurance name
+  payer: string;
   referenceNumber?: string;
   checkNumber?: string;
   eobDate?: string;
@@ -1151,12 +1158,8 @@ export interface BillingStats {
   pendingClaims: number;
   deniedClaims: number;
   overdue30Days: number;
-  collectionRate: number;   // percentage 0-100
+  collectionRate: number;
 }
-
-// ─────────────────────────────────────────────
-// Admin Portal Types
-// ─────────────────────────────────────────────
 
 export type AdminUserStatus = "active" | "inactive" | "suspended" | "pending";
 export type AdminUserRole =
@@ -1235,8 +1238,6 @@ export interface Ward {
   headNurseId?: string;
   headNurseName?: string;
 }
-
-// BedStatus and BedType are defined above (line ~141)
 
 export interface Bed {
   id: string;
@@ -1343,42 +1344,31 @@ export interface AdminStats {
   totalLabTests: number;
   totalRadiologyStudies: number;
   auditLogsToday: number;
-  systemUptime: number;  // percentage
+  systemUptime: number;
 }
-
-// ── CDSS / Clinical Decision Support Types ────────────────────────────────────
 
 /** Which clinical department originated this recommendation */
 export type CDSSSourceModule =
-  | "doctor"    // Encounter/order-driven recommendations
-  | "nursing"   // Deterioration alerts, care reminders, overdue tasks
-  | "lab"       // Panic values, delta checks, critical results
-  | "pharmacy"  // Drug safety, formulary, duplicate therapy
-  | "radiology" // Urgent findings, appropriateness, follow-up reminders
-  | "emergency" // Triage support, resuscitation, critical alerts
-  | "surgery"   // Perioperative warnings, checklist gaps
-  | "system";   // Automated cross-module rules
+  | "doctor"
+  | "nursing"
+  | "lab"
+  | "pharmacy"
+  | "radiology"
+  | "emergency"
+  | "surgery"
+  | "system";
 
 export type CDSSAlertSeverity = "critical" | "warning" | "info";
 
 export type CDSSRecommendationType =
-  // Medication / Safety domain
   | "drug_interaction" | "allergy" | "dosage_warning" | "duplicate_therapy" | "contraindication"
-  // Order / Guideline domain
   | "guideline" | "order_set" | "appropriateness_check"
-  // Diagnostic / Results domain
   | "diagnostic" | "abnormal_result" | "panic_value" | "delta_check" | "critical_result"
-  // Preventive / Screening domain
   | "preventive" | "care_gap" | "follow_up_reminder"
-  // Nursing / Deterioration domain
   | "deterioration_alert" | "overdue_task" | "risk_score"
-  // Radiology domain
   | "urgent_finding"
-  // Emergency domain
   | "triage_support" | "sepsis_alert" | "trauma_alert"
-  // Surgery domain
   | "perioperative_warning" | "checklist_gap"
-  // Cross-cutting
   | "care_plan_deviation";
 
 export type CDSSAlertStatus = "active" | "acknowledged" | "overridden" | "dismissed" | "expired" | "followed";
@@ -1392,12 +1382,12 @@ export type CDSSOverrideReasonCategory =
 export interface CDSSEvidenceSource {
   id: string;
   title: string;
-  shortName: string;       // e.g. "ADA 2026"
+  shortName: string;
   sourceType: CDSSEvidenceSourceType;
   url?: string;
   publishedYear?: number;
-  evidenceGrade?: string;  // e.g. "Level A", "Grade 1B", "Class I"
-  excerpt?: string;        // brief quote from the source
+  evidenceGrade?: string;
+  excerpt?: string;
 }
 
 export interface CDSSClinicalInput {
@@ -1412,7 +1402,7 @@ export interface CDSSExplanation {
   clinicalInputs: CDSSClinicalInput[];
   limitations: string[];
   confidence: CDSSConfidenceLevel;
-  confidenceScore: number;  // 0–100
+  confidenceScore: number;
   modelVersion?: string;
 }
 

@@ -8,18 +8,15 @@ from django.db import models
 from django.conf import settings
 from core.models import TimeStampedModel
 
-
 class EncounterStatus(models.TextChoices):
     IN_PROGRESS = "in-progress", "In Progress"
     COMPLETED = "completed", "Completed"
     SIGNED = "signed", "Signed"
     AMENDED = "amended", "Amended"
 
-
 class VisitType(models.TextChoices):
     INPATIENT = "inpatient", "Inpatient"
     OUTPATIENT = "outpatient", "Outpatient"
-
 
 class Encounter(TimeStampedModel):
     """SOAP note aggregate."""
@@ -43,7 +40,7 @@ class Encounter(TimeStampedModel):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="signed_encounters",
     )
-    amendments = models.JSONField(default=list, blank=True)  # [{amendment, addedAt, addedBy}]
+    amendments = models.JSONField(default=list, blank=True)
 
     class Meta:
         db_table = "encounters"
@@ -55,22 +52,17 @@ class Encounter(TimeStampedModel):
     def __str__(self):
         return f"Encounter - {self.patient.full_name} with {self.doctor.get_full_name() or self.doctor.email}"
 
-
-# ─── Diagnoses ────────────────────────────────────────────────────────────────
-
 class DiagnosisType(models.TextChoices):
     PRIMARY = "primary", "Primary"
     SECONDARY = "secondary", "Secondary"
     DIFFERENTIAL = "differential", "Differential"
     ADMITTING = "admitting", "Admitting"
 
-
 class DiagnosisStatus(models.TextChoices):
     ACTIVE = "active", "Active"
     RESOLVED = "resolved", "Resolved"
     CHRONIC = "chronic", "Chronic"
     SUSPECTED = "suspected", "Suspected"
-
 
 class Diagnosis(TimeStampedModel):
     patient = models.ForeignKey(
@@ -79,10 +71,10 @@ class Diagnosis(TimeStampedModel):
     encounter = models.ForeignKey(
         Encounter, on_delete=models.SET_NULL, null=True, blank=True, related_name="diagnoses"
     )
-    code = models.CharField(max_length=20)  # ICD-10
+    code = models.CharField(max_length=20)
     description = models.TextField()
-    snomed_code = models.CharField(max_length=20, blank=True, null=True)  # SNOMED CT concept ID
-    snomed_display = models.CharField(max_length=300, blank=True, null=True)  # human-readable term
+    snomed_code = models.CharField(max_length=20, blank=True, null=True)
+    snomed_display = models.CharField(max_length=300, blank=True, null=True)
     type = models.CharField(max_length=20, choices=DiagnosisType.choices)
     status = models.CharField(max_length=20, choices=DiagnosisStatus.choices, default=DiagnosisStatus.ACTIVE)
     diagnosed_by = models.ForeignKey(
@@ -96,15 +88,11 @@ class Diagnosis(TimeStampedModel):
     def __str__(self):
         return f"{self.code} - {self.patient.full_name}"
 
-
-# ─── Orders ───────────────────────────────────────────────────────────────────
-
 class OrderCategory(models.TextChoices):
     LAB = "lab", "Laboratory"
     IMAGING = "imaging", "Imaging"
     CONSULT = "consult", "Consultation"
     PROCEDURE = "procedure", "Procedure"
-
 
 class Priority(models.TextChoices):
     ROUTINE = "routine", "Routine"
@@ -112,14 +100,12 @@ class Priority(models.TextChoices):
     STAT = "stat", "STAT"
     ASAP = "asap", "ASAP"
 
-
 class OrderStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     IN_PROGRESS = "in-progress", "In Progress"
     COMPLETED = "completed", "Completed"
     CANCELLED = "cancelled", "Cancelled"
     RESULTED = "resulted", "Resulted"
-
 
 class ImagingBodyPart(models.TextChoices):
     HEAD = "head", "Head"
@@ -134,12 +120,10 @@ class ImagingBodyPart(models.TextChoices):
     WHOLE_BODY = "whole-body", "Whole Body"
     OTHER = "other", "Other"
 
-
 class Laterality(models.TextChoices):
     LEFT = "left", "Left"
     RIGHT = "right", "Right"
     BILATERAL = "bilateral", "Bilateral"
-
 
 class SpecimenType(models.TextChoices):
     BLOOD = "blood", "Blood"
@@ -150,7 +134,6 @@ class SpecimenType(models.TextChoices):
     TISSUE = "tissue", "Tissue"
     SALIVA = "saliva", "Saliva"
     OTHER = "other", "Other"
-
 
 class Order(TimeStampedModel):
     patient = models.ForeignKey(
@@ -185,15 +168,11 @@ class Order(TimeStampedModel):
     def __str__(self):
         return f"{self.name} - {self.patient.full_name}"
 
-
-# ─── Prescriptions ────────────────────────────────────────────────────────────
-
 class PrescriptionStatus(models.TextChoices):
     ACTIVE = "active", "Active"
     DISCONTINUED = "discontinued", "Discontinued"
     ON_HOLD = "on-hold", "On Hold"
     EXPIRED = "expired", "Expired"
-
 
 class Prescription(TimeStampedModel):
     patient = models.ForeignKey(
@@ -213,7 +192,7 @@ class Prescription(TimeStampedModel):
     frequency = models.CharField(max_length=100)
     quantity = models.PositiveIntegerField()
     refills = models.PositiveIntegerField(default=0)
-    sig = models.TextField()  # Prescription instructions
+    sig = models.TextField()
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
     status = models.CharField(
@@ -227,21 +206,16 @@ class Prescription(TimeStampedModel):
     def __str__(self):
         return f"{self.medication} - {self.patient.full_name}"
 
-
-# ─── Referrals ────────────────────────────────────────────────────────────────
-
 class ReferralUrgency(models.TextChoices):
     ROUTINE = "routine", "Routine"
     URGENT = "urgent", "Urgent"
     EMERGENT = "emergent", "Emergent"
-
 
 class ReferralStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     ACCEPTED = "accepted", "Accepted"
     COMPLETED = "completed", "Completed"
     DECLINED = "declined", "Declined"
-
 
 class Referral(TimeStampedModel):
     patient = models.ForeignKey(

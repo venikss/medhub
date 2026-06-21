@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BrainCircuit, Loader2, ClipboardCopy, AlertTriangle, FlaskConical, Pill, PlusCircle, CheckCircle2 } from "lucide-react";
+import { BrainCircuit, Loader2, ClipboardCopy, AlertTriangle, FlaskConical, Pill, PlusCircle, CheckCircle2, Sparkles } from "lucide-react";
+import { useAIAssistantStore } from "@/features/ai-assistant/store";
 import { suggestEncounterAssessment, acceptAIDiagnosis, type EncounterSuggestion, type DifferentialItem, type AcceptedDiagnosis } from "@/features/cdss/api";
 import { createDoctorOrder, createDoctorPrescription } from "@/features/doctor/api";
 import { cn } from "@/lib/utils";
@@ -243,26 +244,22 @@ function parseDurationDays(text: string) {
 /**
  * Strip everything after the first parenthesis, comma-clause, or
  * explanatory phrase so we always store a clean drug name.
+ * Also strips any parenthetical notes like "(Note: patient is already on...)"
  */
 function cleanMedicationName(raw: string): string {
   return raw
-    // Remove action verbs at the start
     .replace(/^(continue|start|add|consider|prescribe|switch to|begin|administer|give|use|hold|resume|maintain|adjust)\s+/i, "")
     .replace(/^(adding|a|an|the)\s+/i, "")
-    // Cut at first parenthesis (e.g. "Furosemide) to manage..." → "Furosemide")
-    .replace(/\(.*$/, "")
-    .replace(/\).*$/, "")
-    // Cut at explanatory suffixes
+    .replace(/\s*\([^)]*\)/g, "")
     .replace(/\s+(to|for|in|if|as|with|by|due|per|via|which|when|unless|while|and|or)\b.*$/i, "")
-    // Cut at dose (e.g. "Metoprolol 25mg" → keep both, handled later)
-    // Remove trailing punctuation
     .replace(/[.,;:*]+$/, "")
     .trim();
 }
 
 function parseMedicationDraft(text: string): MedicationDraft {
-  // ── Strategy 1: pipe-structured format "Drug | dose | route | frequency" ──
-  const pipeParts = text.split("|").map((p) => p.trim());
+  const cleanedText = text.replace(/\s*\([^)]*\)/g, "").trim();
+
+  const pipeParts = cleanedText.split("|").map((p) => p.trim());
   if (pipeParts.length >= 2) {
     const [rawName, rawDose, rawRoute, rawFreq, ...rest] = pipeParts;
     const medicationName = cleanMedicationName(rawName);
@@ -285,7 +282,6 @@ function parseMedicationDraft(text: string): MedicationDraft {
     };
   }
 
-  // ── Strategy 2: heuristic extraction ─────────────────────────────────────
   const doseMatch = text.match(/\b\d+(?:\.\d+)?\s*(?:mg|mcg|g|gram|grams|ml|units?|iu|%)\b(?:\s*\/\s*\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|units?|iu|%))?/i);
   const dose = doseMatch?.[0].replace(/\s+/g, " ") ?? "as directed";
   const beforeDose = doseMatch ? text.slice(0, doseMatch.index).trim() : text;
@@ -358,8 +354,20 @@ export function EncounterAISuggest({
   const [copied, setCopied] = useState<string | null>(null);
   const [actionStatuses, setActionStatuses] = useState<Record<string, ActionStatus>>({});
   const [diagnosisStatuses, setDiagnosisStatuses] = useState<Record<number, ActionStatus>>({});
+  const openWithContext = useAIAssistantStore((s) => s.openWithContext);
+  const patientNameFromStore = useAIAssistantStore((s) => s.patientName);
+
+  const differentialContext = result?.differential?.length
+    ? `\n\n=== AI Differential Diagnoses for This Encounter (pending doctor confirmation) ===\n${result.differential
+        .map((d, i) => `${i + 1}. ${d.diagnosis}${d.icd10Code ? ` (ICD-10: ${d.icd10Code})` : ""}${d.reasoning ? `\n   Reasoning: ${d.reasoning}` : ""}`)
+        .join("\n")}`
+    : "";
 
   async function handleSuggest() {
+    if (!encounterId) {
+      setError("Save the encounter first (click \"Save Draft\"), then request an AI suggestion.");
+      return;
+    }
     setLoading(true);
     setError(null);
     setResult(null);
@@ -494,7 +502,7 @@ export function EncounterAISuggest({
           size="sm"
           className="h-7 text-xs gap-1.5"
           onClick={() => { void handleSuggest(); }}
-          disabled={loading || (!soap.subjective && !soap.objective)}
+          disabled={loading || !encounterId || (!soap.subjective && !soap.objective)}
         >
           {loading ? (
             <><Loader2 className="h-3 w-3 animate-spin" /> Analysing…</>
@@ -509,9 +517,10 @@ export function EncounterAISuggest({
       <CardContent className="space-y-3">
         {!result && !loading && !error && (
           <p className="text-xs text-muted-foreground py-4 text-center">
-            Fill in the Subjective and Objective sections, then click &ldquo;Suggest Assessment &amp; Plan&rdquo;
-            to get AI-generated differential diagnoses, assessment, and plan based on the patient&apos;s
-            full clinical history.
+            {!encounterId
+              ? <>Save the encounter as a draft first, then click &ldquo;Suggest Assessment &amp; Plan&rdquo; to get AI-generated differential diagnoses and a clinical plan.</>
+              : <>Fill in the Subjective and Objective sections, then click &ldquo;Suggest Assessment &amp; Plan&rdquo; to get AI-generated differential diagnoses, assessment, and plan based on the patient&apos;s full clinical history.</>
+            }
           </p>
         )}
 
@@ -579,14 +588,26 @@ export function EncounterAISuggest({
                   <ol className="space-y-2">
                     {result.differential.map((item, i) => {
                       const diagStatus = diagnosisStatuses[i];
+                      const likelihoodStyle =
+                        item.likelihood === "MOST LIKELY"
+                          ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                          : "bg-amber-50 text-amber-700 border-amber-300";
                       return (
                         <li key={i} className="rounded-lg border border-border/60 bg-background p-3 text-sm">
                           <div className="flex items-start gap-3">
-                            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                            <span className={cn(
+                              "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                              item.likelihood === "MOST LIKELY" ? "bg-emerald-600 text-white" : "bg-primary text-primary-foreground"
+                            )}>
                               {i + 1}
                             </span>
                             <div className="flex-1 min-w-0">
                               <div className="flex flex-wrap items-center gap-1.5">
+                                {item.likelihood && (
+                                  <span className={cn("text-[10px] font-semibold px-1.5 py-0 rounded border", likelihoodStyle)}>
+                                    {item.likelihood}
+                                  </span>
+                                )}
                                 <span className="font-semibold text-foreground">{item.diagnosis}</span>
                                 {item.icd10Code && (
                                   <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
@@ -674,7 +695,10 @@ export function EncounterAISuggest({
               <TabsContent value="plan" className="mt-0 space-y-3">
                 <div className="rounded-lg border border-border/60 bg-background p-3">
                   <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                    {result.plan || "No suggested plan was returned."}
+                    {result.plan
+                      .replace(/\s*\([^)\n]{10,}\)/g, "")
+                      .trim()
+                      || "No suggested plan was returned."}
                   </div>
                 </div>
                 {result.plan && (
@@ -684,7 +708,11 @@ export function EncounterAISuggest({
                         size="sm"
                         variant="default"
                         className="gap-1 text-xs"
-                        onClick={() => onApplyPlan(result.plan)}
+                        onClick={() => onApplyPlan(
+                        result.plan
+                          .replace(/\s*\([^)\n]{10,}\)/g, "")
+                          .trim()
+                      )}
                       >
                         Apply to Plan
                       </Button>
@@ -693,7 +721,12 @@ export function EncounterAISuggest({
                       size="sm"
                       variant="outline"
                       className="gap-1 text-xs"
-                      onClick={() => copyToClipboard(result.plan, "plan")}
+                      onClick={() => copyToClipboard(
+                        result.plan
+                          .replace(/\s*\([^)\n]{10,}\)/g, "")
+                          .trim(),
+                        "plan"
+                      )}
                     >
                       <ClipboardCopy className="h-3.5 w-3.5" />
                       {copied === "plan" ? "Copied!" : "Copy"}
@@ -732,22 +765,39 @@ export function EncounterAISuggest({
                                       : `Lab · specimen: ${draft.specimenType}`} · priority: {draft.priority}
                                   </p>
                                 </div>
-                                <Button
-                                  size="sm"
-                                  variant={isDone ? "secondary" : "outline"}
-                                  className="w-full gap-1 text-xs"
-                                  disabled={isBusy || isDone}
-                                  onClick={() => { void handleCreateInvestigation(draft); }}
-                                >
-                                  {isBusy ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : isDone ? (
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                  ) : (
-                                    <PlusCircle className="h-3.5 w-3.5" />
-                                  )}
-                                  {isImaging ? "Add radiology" : "Add lab"}
-                                </Button>
+                                <div className="flex gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    variant={isDone ? "secondary" : "outline"}
+                                    className="flex-1 gap-1 text-xs"
+                                    disabled={isBusy || isDone}
+                                    onClick={() => { void handleCreateInvestigation(draft); }}
+                                  >
+                                    {isBusy ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : isDone ? (
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <PlusCircle className="h-3.5 w-3.5" />
+                                    )}
+                                    {isImaging ? "Add radiology" : "Add lab"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-1 text-xs border-sky-500/40 text-sky-600 hover:bg-sky-50 dark:text-sky-400"
+                                    onClick={() =>
+                                      openWithContext(
+                                        patientId,
+                                        patientNameFromStore ?? "this patient",
+                                        `Why is ${draft.orderableName} indicated for this patient?`,  
+                                      )
+                                    }
+                                  >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    Ask AI
+                                  </Button>
+                                </div>
                               </div>
                               {status?.message && (
                                 <p className={cn(
@@ -794,22 +844,39 @@ export function EncounterAISuggest({
                                     SIG: {draft.sig}
                                   </p>
                                 </div>
-                                <Button
-                                  size="sm"
-                                  variant={isDone ? "secondary" : "outline"}
-                                  className="w-full gap-1 text-xs"
-                                  disabled={isBusy || isDone}
-                                  onClick={() => { void handleCreatePrescription(draft.sourceText); }}
-                                >
-                                  {isBusy ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : isDone ? (
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                  ) : (
-                                    <PlusCircle className="h-3.5 w-3.5" />
-                                  )}
-                                  Prescribe
-                                </Button>
+                                <div className="flex gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    variant={isDone ? "secondary" : "outline"}
+                                    className="flex-1 gap-1 text-xs"
+                                    disabled={isBusy || isDone}
+                                    onClick={() => { void handleCreatePrescription(draft.sourceText); }}
+                                  >
+                                    {isBusy ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : isDone ? (
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <PlusCircle className="h-3.5 w-3.5" />
+                                    )}
+                                    Prescribe
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-1 text-xs border-sky-500/40 text-sky-600 hover:bg-sky-50 dark:text-sky-400"
+                                    onClick={() =>
+                                      openWithContext(
+                                        patientId,
+                                        patientNameFromStore ?? "this patient",
+                                        `Why was ${draft.medicationName} ${draft.dose} ${draft.route} ${draft.frequency} recommended for this patient?`,  
+                                      )
+                                    }
+                                  >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    Ask AI
+                                  </Button>
+                                </div>
                               </div>
                               {status?.message && (
                                 <p className={cn(

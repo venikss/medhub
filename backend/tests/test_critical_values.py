@@ -10,7 +10,6 @@ from unittest.mock import patch
 from rest_framework.test import APIClient
 from rest_framework import status
 
-
 def make_user(role="doctor", email=None, password="Test@1234"):
     from apps.authentication.models import User
     email = email or f"{role}_{id(object())}@test.com"
@@ -20,13 +19,11 @@ def make_user(role="doctor", email=None, password="Test@1234"):
         role=role, status="active",
     )
 
-
 def auth_header(client, user, password="Test@1234"):
     resp = client.post("/api/v1/auth/login/", {"email": user.email, "password": password}, format="json")
     data = resp.json()
     token = data.get("accessToken") or data.get("access") or data.get("token")
     return {"HTTP_AUTHORIZATION": f"Bearer {token}"}
-
 
 def make_patient():
     from apps.patients.models import Patient
@@ -38,7 +35,6 @@ def make_patient():
         gender="male", phone=f"+20200{uuid.uuid4().hex[:7]}",
         status="active",
     )
-
 
 @pytest.mark.django_db
 class TestLabCriticalValueWorkflow:
@@ -78,7 +74,6 @@ class TestLabCriticalValueWorkflow:
             f"/api/v1/lab/reports/{report.id}/release/",
             {}, format="json", **headers,
         )
-        # If successfully released, CriticalValue records should be created
         if resp.status_code in (200, 201):
             after_crit = CriticalValue.objects.filter(patient=patient).count()
             assert after_crit > before_crit
@@ -121,7 +116,6 @@ class TestLabCriticalValueWorkflow:
         if resp.status_code == 200:
             critical_value.refresh_from_db()
             assert critical_value.is_acknowledged is True
-
 
 @pytest.mark.django_db
 class TestRadiologyCriticalFindingWorkflow:
@@ -176,5 +170,4 @@ class TestRadiologyCriticalFindingWorkflow:
                 patient=patient, type=CDSSRecommendationType.URGENT_FINDING
             ).count()
             assert after_count > before_count
-            # Verify broadcast was called
             mock_broadcast.assert_called()

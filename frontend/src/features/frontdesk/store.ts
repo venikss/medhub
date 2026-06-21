@@ -1,23 +1,18 @@
 import { create } from "zustand";
 
 interface FrontDeskState {
-    // Patient search
     searchQuery: string;
     setSearchQuery: (q: string) => void;
 
-    // Selected patient for actions
     selectedPatientId: string | null;
     setSelectedPatientId: (id: string | null) => void;
 
-    // Bed filter
     bedWardFilter: string | null;
     setBedWardFilter: (ward: string | null) => void;
 
-    // Queue filter
     queueServiceFilter: string | null;
     setQueueServiceFilter: (service: string | null) => void;
 
-    // Dialogs
     isAdmitDialogOpen: boolean;
     isTransferDialogOpen: boolean;
     isDischargeDialogOpen: boolean;

@@ -20,9 +20,9 @@ interface UseCDSSModuleOptions {
  *
  * Usage:
  *   const cdss = useCDSSModule({ module: "pharmacy", patientId: "pat-002" });
- *   // cdss.recommendations — filtered, role-aware list
- *   // cdss.counts.critical — urgency indicator for badges
- *   // cdss.openOverride(id) — triggers local override dialog
+ *
+ *
+ *
  *
  * This hook owns its own selection and modal UI state so it does NOT
  * pollute the central hub store with embedded-module state.
@@ -32,13 +32,11 @@ export function useCDSSModule({ module, patientId }: UseCDSSModuleOptions) {
   const token = useAuthStore((state) => state.token);
   const adapter = useMemo(() => getAdapter(module), [module]);
 
-  // Local UI state — independent from the hub page state
   const [selectedId, setSelectedId]               = useState<string | null>(null);
   const [showOverride, setShowOverride]           = useState(false);
   const [overrideTargetId, setOverrideTargetId]  = useState<string | null>(null);
   const [showEvidence, setShowEvidence]           = useState(false);
 
-  // Data: filter global store recs through the module adapter
   const scopedRecs = useMemo(() => {
     const all = patientId
       ? store.recommendations.filter((r) => r.patientId === patientId)
@@ -79,16 +77,12 @@ export function useCDSSModule({ module, patientId }: UseCDSSModuleOptions) {
     clinicianRole: string;
   }) {
     if (!overrideTargetId) return;
-    // Route through the global store so the override is persisted centrally
-    // and the audit trail is always consistent regardless of which module
-    // initiated the response.
     store.openOverrideModal(overrideTargetId);
     store.submitOverride({ ...payload, sourceModule: module, token });
     closeOverride();
   }
 
   return {
-    // Data
     recommendations: scopedRecs,
     activeRecs,
     criticalRecs,
@@ -97,22 +91,18 @@ export function useCDSSModule({ module, patientId }: UseCDSSModuleOptions) {
       patientId ? o.patientId === patientId : true
     ),
 
-    // Selection
     selectedRec,
     selectRecommendation: (id: string | null) => setSelectedId(id),
 
-    // Override modal
     overrideTarget,
     showOverride,
     openOverride,
     closeOverride,
     submitOverride,
 
-    // Evidence drawer
     showEvidence,
     setShowEvidence,
 
-    // Adapter metadata
     moduleLabel: adapter.label,
     sourceModule: module,
   };

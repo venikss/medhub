@@ -12,8 +12,9 @@ from .models import (
     RadiologyReport,
     RadCriticalFinding,
     ModalitySchedule,
+    DicomSeries,
+    DicomFile,
 )
-
 
 BODY_PART_CHOICES = [
     ("head", "Head"),
@@ -42,7 +43,6 @@ LATERALITY_CHOICES = [
     ("bilateral", "Bilateral"),
 ]
 
-
 def get_exam_code_choices():
     catalog_items = RadiologyCatalogItem.objects.filter(is_active=True).order_by("modality", "name")
     choices = []
@@ -52,7 +52,6 @@ def get_exam_code_choices():
         if item.cpt_code and item.cpt_code.upper() != item.code.upper():
             choices.append((item.cpt_code, f"{item.cpt_code} - {item.name}"))
     return choices
-
 
 class ImagingOrderSerializer(serializers.ModelSerializer):
     patientId = serializers.UUIDField(source="patient_id")
@@ -199,14 +198,11 @@ class ImagingStudySerializer(serializers.ModelSerializer):
         data["priority"] = instance.order.priority if hasattr(instance, "order") else None
         data["clinicalHistory"] = instance.order.clinical_history if hasattr(instance, "order") else None
         data["reportId"] = str(instance.report.id) if hasattr(instance, "report") else None
-        # examTime for frontend StudyCard
         data["examTime"] = instance.exam_date.strftime("%H:%M") if instance.exam_date else None
-        # technologist / radiologist come from the linked order
         data["technologist"] = instance.order.technologist.get_full_name() if hasattr(instance, "order") and instance.order.technologist_id else None
         data["radiologist"] = instance.order.assigned_radiologist.get_full_name() if hasattr(instance, "order") and instance.order.assigned_radiologist_id else None
         data["hasCritical"] = instance.critical_findings.exists()
         return data
-
 
 class RadiologyReportSerializer(serializers.ModelSerializer):
     studyId = serializers.UUIDField(source="study_id")
@@ -255,8 +251,8 @@ class RadiologyReportSerializer(serializers.ModelSerializer):
         data["hasCritical"] = instance.study.critical_findings.exists() if instance.study_id else False
         data["signedByName"] = instance.signed_by.get_full_name() if instance.signed_by_id else None
         data["addendumByName"] = instance.addendum_by.get_full_name() if instance.addendum_by_id else None
+        data["pacsUrl"] = instance.study.pacs_url if instance.study_id else None
         return data
-
 
 class RadCriticalFindingSerializer(serializers.ModelSerializer):
     studyId = serializers.UUIDField(source="study_id")
@@ -306,7 +302,6 @@ class RadCriticalFindingSerializer(serializers.ModelSerializer):
         data["acknowledgedByName"] = instance.acknowledged_by.get_full_name() if instance.acknowledged_by_id else None
         return data
 
-
 class ModalityScheduleSerializer(serializers.ModelSerializer):
     patientId = serializers.UUIDField(source="patient_id", required=False, allow_null=True)
     examName = serializers.CharField(source="exam_name", required=False, allow_null=True, allow_blank=True)
@@ -327,9 +322,42 @@ class ModalityScheduleSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["patientName"] = instance.patient.full_name if instance.patient_id else None
-        # Frontend expects: available | scheduled | in-progress | completed | blocked | cancelled
-        # Backend stores: available | booked | blocked
         if data["status"] == "booked":
             data["status"] = "scheduled"
         return data
+
+class DicomFileSerializer(serializers.ModelSerializer):
+    fileUrl = serializers.URLField(source="file_url")
+    fileName = serializers.CharField(source="file_name")
+    fileSize = serializers.IntegerField(source="file_size", allow_null=True)
+    instanceNumber = serializers.IntegerField(source="instance_number", allow_null=True)
+
+    class Meta:
+        model = DicomFile
+        fields = ["id", "fileUrl", "fileName", "fileSize", "instanceNumber"]
+
+class DicomSeriesSerializer(serializers.ModelSerializer):
+    studyId = serializers.UUIDField(source="study_id", read_only=True)
+    seriesNumber = serializers.IntegerField(source="series_number", read_only=True)
+    seriesUid = serializers.CharField(source="series_uid", read_only=True, allow_null=True)
+    description = serializers.CharField(read_only=True, allow_null=True)
+    modality = serializers.CharField(read_only=True, allow_null=True)
+    bodyPart = serializers.CharField(source="body_part", read_only=True, allow_null=True)
+    sliceCount = serializers.IntegerField(source="slice_count", read_only=True)
+    uploadedAt = serializers.DateTimeField(source="created_at", read_only=True)
+    uploadedByName = serializers.SerializerMethodField()
+    files = DicomFileSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DicomSeries
+        fields = [
+            "id", "studyId", "seriesNumber", "seriesUid", "description",
+            "modality", "bodyPart", "sliceCount", "uploadedAt", "uploadedByName", "files",
+        ]
+
+    def get_uploadedByName(self, obj):
+        if obj.uploaded_by_id:
+            u = obj.uploaded_by
+            return f"{u.first_name} {u.last_name}".strip() or u.email
+        return None
 

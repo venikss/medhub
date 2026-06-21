@@ -1,6 +1,6 @@
 "use client";
 
-import { BrainCircuit, Eye, MessageSquare } from "lucide-react";
+import { BrainCircuit, Eye, MessageSquare, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ interface RecommendationCardProps {
   onSelect?: () => void;
   onExplain?: () => void;
   onOverride?: () => void;
+  onAskAI?: () => void;
   className?: string;
 }
 
@@ -32,7 +33,7 @@ interface RecommendationCardProps {
  */
 export function RecommendationCard({
   rec, selected, hidePatient, showModule, compact,
-  onSelect, onExplain, onOverride, className,
+  onSelect, onExplain, onOverride, onAskAI, className,
 }: RecommendationCardProps) {
   const cfg         = SEVERITY_CONFIG[rec.severity];
   const Icon        = cfg.icon;
@@ -111,7 +112,7 @@ export function RecommendationCard({
       )}
 
       {/* Action buttons */}
-      {(onExplain || onOverride) && !compact && (
+      {(onExplain || onOverride || onAskAI) && !compact && (
         <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-border/30">
           {onExplain && (
             <Button
@@ -131,6 +132,16 @@ export function RecommendationCard({
               onClick={(e) => { e.stopPropagation(); onOverride(); }}
             >
               <MessageSquare className="h-3 w-3" /> Respond
+            </Button>
+          )}
+          {onAskAI && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto h-7 text-xs gap-1 border-sky-500/40 text-sky-600 hover:bg-sky-50 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-950/40"
+              onClick={(e) => { e.stopPropagation(); onAskAI(); }}
+            >
+              <Sparkles className="h-3 w-3" /> Ask AI
             </Button>
           )}
         </div>

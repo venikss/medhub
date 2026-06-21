@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE_URL } from "@/lib/api";
 import type {
   CDSSOverrideRecord,
   CDSSPatientModuleGraphSummary,
@@ -141,33 +141,24 @@ export function listCDSSRecommendations(
 }
 
 export async function listCDSSOverrides(token?: string | null): Promise<CDSSOverrideRecord[]> {
-  const [overrides, recommendations] = await Promise.all([
-    getPaginatedList<CDSSOverrideBackend>("/cdss/overrides/", token),
-    listCDSSRecommendations({}, token),
-  ]);
+  const overrides = await getPaginatedList<CDSSOverrideBackend>("/cdss/overrides/", token);
 
-  const recommendationMap = new Map(recommendations.map((rec) => [rec.id, rec]));
-
-  return overrides.map((override) => {
-    const rec = recommendationMap.get(override.recommendationId);
-
-    return {
-      id: override.id,
-      recommendationId: override.recommendationId,
-      recommendationTitle: rec?.title ?? "CDSS Recommendation",
-      patientId: rec?.patientId ?? "",
-      patientName: rec?.patientName ?? "Unknown Patient",
-      clinicianId: "",
-      clinicianName: override.clinicianName,
-      clinicianRole: override.clinicianRole,
-      action: override.action,
-      reasonCategory: override.reasonCategory,
-      reason: override.reason,
-      timestamp: override.recordedAt,
-      notes: override.notes,
-      sourceModule: override.sourceModule ?? rec?.sourceModule,
-    };
-  });
+  return overrides.map((override) => ({
+    id: override.id,
+    recommendationId: override.recommendationId,
+    recommendationTitle: "CDSS Override",
+    patientId: (override as any).patientId ?? "",
+    patientName: (override as any).patientName || "—",
+    clinicianId: "",
+    clinicianName: override.clinicianName,
+    clinicianRole: override.clinicianRole,
+    action: override.action,
+    reasonCategory: override.reasonCategory,
+    reason: override.reason,
+    timestamp: override.recordedAt,
+    notes: override.notes,
+    sourceModule: override.sourceModule,
+  }));
 }
 
 export function getPatientCDSSSummary(patientId: string, token?: string | null) {
@@ -265,10 +256,100 @@ export async function chatWithPatient(
   }) as Promise<{ response: string; history: ChatMessage[] }>;
 }
 
+export type ChatStreamEvent =
+  | { type: "thinking"; text: string }
+  | { type: "answer"; text: string }
+  | { type: "done"; history: ChatMessage[] }
+  | { type: "error"; text: string };
+
+export async function* chatWithPatientStream(
+  patientId: string,
+  message: string,
+  history: ChatMessage[],
+  token?: string | null,
+): AsyncGenerator<ChatStreamEvent> {
+  const readStoredToken = (): string | null => {
+    try {
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem("medhub-auth") : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { state?: { token?: string | null }; token?: string | null } | null;
+      return (parsed && "state" in parsed ? parsed.state?.token : (parsed as { token?: string | null } | null)?.token) ?? null;
+    } catch { return null; }
+  };
+
+  const makeStreamRequest = (tok: string | null) =>
+    fetch(`${API_BASE_URL}/cdss/patients/${patientId}/chat/stream/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
+      },
+      body: JSON.stringify({ message, history }),
+    });
+
+  let resolvedToken = readStoredToken() ?? token ?? null;
+  let res = await makeStreamRequest(resolvedToken);
+
+  if (res.status === 401) {
+    try {
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem("medhub-auth") : null;
+      if (raw) {
+        const stored = JSON.parse(raw) as { state?: { token?: string | null; refreshToken?: string | null }; refreshToken?: string | null };
+        const refreshToken = (stored && "state" in stored ? stored.state?.refreshToken : (stored as { refreshToken?: string | null } | null)?.refreshToken) ?? null;
+        if (refreshToken) {
+          const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refreshToken }),
+          });
+          if (refreshRes.ok) {
+            const refreshed = (await refreshRes.json()) as { token: string; refreshToken: string };
+            if ("state" in stored && stored.state) {
+              stored.state.token = refreshed.token;
+              stored.state.refreshToken = refreshed.refreshToken;
+            } else {
+              (stored as Record<string, unknown>).token = refreshed.token;
+              (stored as Record<string, unknown>).refreshToken = refreshed.refreshToken;
+            }
+            window.localStorage.setItem("medhub-auth", JSON.stringify(stored));
+            resolvedToken = refreshed.token;
+            res = await makeStreamRequest(resolvedToken);
+          }
+        }
+      }
+    } catch { /* fall through to error handling below */ }
+  }
+
+  if (!res.ok || !res.body) {
+    throw new Error(`Chat stream failed: ${res.status}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() ?? "";
+    for (const part of parts) {
+      const line = part.trim();
+      if (!line.startsWith("data: ")) continue;
+      try {
+        yield JSON.parse(line.slice(6)) as ChatStreamEvent;
+      } catch {
+      }
+    }
+  }
+}
+
 export interface DifferentialItem {
   diagnosis: string;
   icd10Code?: string | null;
   reasoning?: string;
+  likelihood?: "MOST LIKELY" | "POSSIBLE" | "RULE OUT" | null;
 }
 
 export interface EncounterSuggestion {

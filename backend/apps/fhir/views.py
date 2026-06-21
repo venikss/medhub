@@ -21,12 +21,8 @@ from rest_framework.views import APIView
 from apps.patients.models import Patient
 from core.exceptions import NotFoundError
 
-
-# ─── Helpers ──────────────────────────────────────────────────────────────────
-
 def _now_fhir() -> str:
     return datetime.now(tz=dt_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
 
 def _date_fhir(value) -> str | None:
     if value is None:
@@ -35,14 +31,12 @@ def _date_fhir(value) -> str | None:
         return value.isoformat()[:10]
     return str(value)
 
-
 def _datetime_fhir(value) -> str | None:
     if value is None:
         return None
     if hasattr(value, "strftime"):
         return value.strftime("%Y-%m-%dT%H:%M:%SZ")
     return str(value)
-
 
 def _gender_fhir(gender: str) -> str:
     mapping = {
@@ -54,12 +48,8 @@ def _gender_fhir(gender: str) -> str:
     }
     return mapping.get((gender or "").lower(), "unknown")
 
-
 def _uuid_ref(resource_type: str, obj_id) -> dict:
     return {"reference": f"{resource_type}/{obj_id}"}
-
-
-# ─── Resource mappers ─────────────────────────────────────────────────────────
 
 def patient_to_fhir(patient: Patient) -> dict:
     """Map patients.Patient → FHIR R4 Patient resource."""
@@ -135,7 +125,6 @@ def patient_to_fhir(patient: Patient) -> dict:
 
     return resource
 
-
 def diagnosis_to_fhir(diag) -> dict:
     """Map doctors.Diagnosis → FHIR R4 Condition resource."""
     coding = [
@@ -186,7 +175,6 @@ def diagnosis_to_fhir(diag) -> dict:
         "recorder": _uuid_ref("Practitioner", diag.diagnosed_by_id) if diag.diagnosed_by_id else None,
     }
 
-
 def prescription_to_fhir(rx) -> dict:
     """Map doctors.Prescription → FHIR R4 MedicationRequest resource."""
     status_map = {
@@ -196,10 +184,10 @@ def prescription_to_fhir(rx) -> dict:
         "expired": "completed",
     }
     route_map = {
-        "oral": "26643006",     # SNOMED: oral route
-        "iv": "47625008",        # SNOMED: intravenous
-        "im": "78421000",        # SNOMED: intramuscular
-        "sc": "34206005",        # SNOMED: subcutaneous
+        "oral": "26643006",
+        "iv": "47625008",
+        "im": "78421000",
+        "sc": "34206005",
         "topical": "6064005",
         "inhaled": "18679011000001101",
         "sublingual": "37839007",
@@ -267,7 +255,6 @@ def prescription_to_fhir(rx) -> dict:
         )
     return resource
 
-
 def lab_result_to_fhir(result) -> dict:
     """Map laboratory.LabTestResult → FHIR R4 Observation resource."""
     status_fhir_map = {
@@ -322,7 +309,6 @@ def lab_result_to_fhir(result) -> dict:
 
     return resource
 
-
 def lab_report_to_fhir(report) -> dict:
     """Map laboratory.LabReport → FHIR R4 DiagnosticReport resource."""
     status_map = {
@@ -363,7 +349,6 @@ def lab_report_to_fhir(report) -> dict:
         "conclusion": getattr(report, "notes", None) or "",
     }
 
-
 def imaging_study_to_fhir(study) -> dict:
     """Map radiology.ImagingStudy → FHIR R4 ImagingStudy resource."""
     modality = getattr(getattr(study, "order", None), "modality", "") or ""
@@ -385,13 +370,11 @@ def imaging_study_to_fhir(study) -> dict:
         "endpoint": [{"reference": study.pacs_url}] if study.pacs_url else [],
     }
 
-
 def _try_float(value) -> float | None:
     try:
         return float(value)
     except (TypeError, ValueError):
         return None
-
 
 def _bundle_entry(resource: dict, base_url: str) -> dict:
     rt = resource["resourceType"]
@@ -402,12 +385,8 @@ def _bundle_entry(resource: dict, base_url: str) -> dict:
         "search": {"mode": "match"},
     }
 
-
-# ─── Views ────────────────────────────────────────────────────────────────────
-
 def _base_url(request) -> str:
     return request.build_absolute_uri("/").rstrip("/")
-
 
 class FhirPatientView(APIView):
     """GET /fhir/Patient/:id → FHIR R4 Patient resource"""
@@ -419,7 +398,6 @@ class FhirPatientView(APIView):
         except Patient.DoesNotExist:
             raise NotFoundError("Patient not found.")
         return JsonResponse(patient_to_fhir(patient), content_type="application/fhir+json")
-
 
 class FhirPatientEverythingView(APIView):
     """GET /fhir/Patient/:id/$everything → FHIR R4 Bundle"""
@@ -437,27 +415,22 @@ class FhirPatientEverythingView(APIView):
         base = _base_url(request)
         entries = [_bundle_entry(patient_to_fhir(patient), base)]
 
-        # Conditions (diagnoses)
         from apps.doctors.models import Diagnosis
         for diag in Diagnosis.objects.filter(patient=patient).select_related("encounter"):
             entries.append(_bundle_entry(diagnosis_to_fhir(diag), base))
 
-        # MedicationRequests (prescriptions)
         from apps.doctors.models import Prescription
         for rx in Prescription.objects.filter(patient=patient):
             entries.append(_bundle_entry(prescription_to_fhir(rx), base))
 
-        # Observations (lab results)
         from apps.laboratory.models import LabTestResult
         for result in LabTestResult.objects.filter(panel__patient=patient).select_related("panel"):
             entries.append(_bundle_entry(lab_result_to_fhir(result), base))
 
-        # DiagnosticReports (lab reports)
         from apps.laboratory.models import LabReport
         for report in LabReport.objects.filter(patient=patient).select_related("panel"):
             entries.append(_bundle_entry(lab_report_to_fhir(report), base))
 
-        # ImagingStudies
         from apps.radiology.models import ImagingStudy
         for study in ImagingStudy.objects.filter(patient=patient).select_related("order"):
             entries.append(_bundle_entry(imaging_study_to_fhir(study), base))
@@ -478,7 +451,6 @@ class FhirPatientEverythingView(APIView):
         }
         return JsonResponse(bundle, content_type="application/fhir+json")
 
-
 class FhirConditionView(APIView):
     """GET /fhir/Condition/:id → FHIR R4 Condition"""
     permission_classes = [IsAuthenticated]
@@ -490,7 +462,6 @@ class FhirConditionView(APIView):
         except Diagnosis.DoesNotExist:
             raise NotFoundError("Condition not found.")
         return JsonResponse(diagnosis_to_fhir(diag), content_type="application/fhir+json")
-
 
 class FhirMedicationRequestView(APIView):
     """GET /fhir/MedicationRequest/:id → FHIR R4 MedicationRequest"""
@@ -504,7 +475,6 @@ class FhirMedicationRequestView(APIView):
             raise NotFoundError("MedicationRequest not found.")
         return JsonResponse(prescription_to_fhir(rx), content_type="application/fhir+json")
 
-
 class FhirObservationView(APIView):
     """GET /fhir/Observation/:id → FHIR R4 Observation"""
     permission_classes = [IsAuthenticated]
@@ -516,7 +486,6 @@ class FhirObservationView(APIView):
         except LabTestResult.DoesNotExist:
             raise NotFoundError("Observation not found.")
         return JsonResponse(lab_result_to_fhir(result), content_type="application/fhir+json")
-
 
 class FhirDiagnosticReportView(APIView):
     """GET /fhir/DiagnosticReport/:id → FHIR R4 DiagnosticReport"""
@@ -530,7 +499,6 @@ class FhirDiagnosticReportView(APIView):
             raise NotFoundError("DiagnosticReport not found.")
         return JsonResponse(lab_report_to_fhir(report), content_type="application/fhir+json")
 
-
 class FhirImagingStudyView(APIView):
     """GET /fhir/ImagingStudy/:id → FHIR R4 ImagingStudy"""
     permission_classes = [IsAuthenticated]
@@ -542,7 +510,6 @@ class FhirImagingStudyView(APIView):
         except ImagingStudy.DoesNotExist:
             raise NotFoundError("ImagingStudy not found.")
         return JsonResponse(imaging_study_to_fhir(study), content_type="application/fhir+json")
-
 
 class FhirCapabilityStatementView(APIView):
     """GET /fhir/metadata → FHIR R4 CapabilityStatement"""

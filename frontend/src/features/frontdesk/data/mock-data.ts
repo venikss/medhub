@@ -8,8 +8,6 @@ import type {
     ConsentDocument,
 } from "@/types";
 
-// ── Patients ──────────────────────────────────────────────────────────
-
 export const mockADTPatients: ADTPatient[] = [
     {
         id: "P001", mrn: "MRN-2026-0001", firstName: "Emily", lastName: "Johnson",
@@ -91,10 +89,7 @@ export const mockADTPatients: ADTPatient[] = [
     },
 ];
 
-// ── Beds ───────────────────────────────────────────────────────────────
-
 export const mockBeds: BedInfo[] = [
-    // Ward A — 10 beds
     { bedId: "A-101-1", ward: "Ward A", roomNumber: "101", bedNumber: "1", type: "general", status: "occupied", patientId: "P007", patientName: "Anna White" },
     { bedId: "A-101-2", ward: "Ward A", roomNumber: "101", bedNumber: "2", type: "general", status: "available" },
     { bedId: "A-102-1", ward: "Ward A", roomNumber: "102", bedNumber: "1", type: "general", status: "occupied", patientId: "P004", patientName: "Michael Lee" },
@@ -105,7 +100,6 @@ export const mockBeds: BedInfo[] = [
     { bedId: "A-105-1", ward: "Ward A", roomNumber: "105", bedNumber: "1", type: "general", status: "maintenance" },
     { bedId: "A-105-2", ward: "Ward A", roomNumber: "105", bedNumber: "2", type: "general", status: "available" },
     { bedId: "A-106-1", ward: "Ward A", roomNumber: "106", bedNumber: "1", type: "general", status: "available" },
-    // Ward B — 8 beds
     { bedId: "B-201-1", ward: "Ward B", roomNumber: "201", bedNumber: "1", type: "general", status: "occupied", patientName: "Lisa Chen" },
     { bedId: "B-201-2", ward: "Ward B", roomNumber: "201", bedNumber: "2", type: "general", status: "occupied", patientName: "Mark Evans" },
     { bedId: "B-202-1", ward: "Ward B", roomNumber: "202", bedNumber: "1", type: "semi-private", status: "available" },
@@ -114,7 +108,6 @@ export const mockBeds: BedInfo[] = [
     { bedId: "B-203-2", ward: "Ward B", roomNumber: "203", bedNumber: "2", type: "general", status: "available" },
     { bedId: "B-204-1", ward: "Ward B", roomNumber: "204", bedNumber: "1", type: "private", status: "occupied", patientName: "Grace Kim" },
     { bedId: "B-205-1", ward: "Ward B", roomNumber: "205", bedNumber: "1", type: "general", status: "reserved" },
-    // ICU — 6 beds
     { bedId: "ICU-01", ward: "ICU", roomNumber: "ICU", bedNumber: "01", type: "icu", status: "occupied", patientId: "P002", patientName: "Robert Williams" },
     { bedId: "ICU-02", ward: "ICU", roomNumber: "ICU", bedNumber: "02", type: "icu", status: "occupied", patientName: "Helen Parker" },
     { bedId: "ICU-03", ward: "ICU", roomNumber: "ICU", bedNumber: "03", type: "icu", status: "available" },
@@ -123,8 +116,6 @@ export const mockBeds: BedInfo[] = [
     { bedId: "ICU-06", ward: "ICU", roomNumber: "ICU", bedNumber: "06", type: "icu", status: "maintenance" },
 ];
 
-// ── Admissions ────────────────────────────────────────────────────────
-
 export const mockAdmissions: Admission[] = [
     { id: "ADM-001", patientId: "P002", patientName: "Robert Williams", mrn: "MRN-2026-0002", type: "emergency", admittingDoctor: "Dr. David Chen", department: "Cardiology", ward: "ICU", bed: "ICU-01", reasonForAdmission: "Acute myocardial infarction", admittedAt: "2026-03-08T02:30:00", status: "admitted", expectedDischarge: "2026-03-14" },
     { id: "ADM-002", patientId: "P003", patientName: "Sarah Davis", mrn: "MRN-2026-0003", type: "inpatient", admittingDoctor: "Dr. Sarah Kim", department: "Surgery", ward: "Ward B", bed: "B-202-2", reasonForAdmission: "Post-operative recovery — appendectomy", admittedAt: "2026-03-07T14:00:00", status: "admitted", expectedDischarge: "2026-03-11" },
@@ -132,8 +123,6 @@ export const mockAdmissions: Admission[] = [
     { id: "ADM-004", patientId: "P001", patientName: "Emily Johnson", mrn: "MRN-2026-0001", type: "outpatient", admittingDoctor: "Dr. David Chen", department: "Internal Medicine", ward: undefined, bed: undefined, reasonForAdmission: "Diabetes follow-up & blood work", admittedAt: "2026-03-10T09:00:00", status: "admitted" },
     { id: "ADM-005", patientId: "P006", patientName: "James Martinez", mrn: "MRN-2026-0006", type: "observation", admittingDoctor: "Dr. Nina Patel", department: "Neurology", ward: "Ward A", bed: "A-102-1", reasonForAdmission: "Syncope — cardiac workup pending", admittedAt: "2026-03-10T07:15:00", status: "admitted", expectedDischarge: "2026-03-11" },
 ];
-
-// ── Queue ──────────────────────────────────────────────────────────────
 
 export const mockQueue: QueueEntry[] = [
     { id: "Q001", ticketNo: "A-001", patientId: "P001", patientName: "Emily Johnson", service: "consultation", priority: "normal", status: "serving", waitingSince: "2026-03-10T08:45:00", window: "Window 2", estimatedWait: 0 },
@@ -146,8 +135,6 @@ export const mockQueue: QueueEntry[] = [
     { id: "Q008", ticketNo: "B-002", patientId: "P008", patientName: "David Park", service: "consultation", priority: "normal", status: "completed", waitingSince: "2026-03-10T08:00:00", window: "Window 1" },
 ];
 
-// ── Appointments (today) ──────────────────────────────────────────────
-
 export const mockFrontdeskAppointments: Appointment[] = [
     { id: "APT-101", patientId: "P001", patientName: "Emily Johnson", doctorId: "D001", doctorName: "Dr. David Chen", department: "Internal Medicine", date: "2026-03-10", time: "09:00", duration: 30, status: "scheduled", type: "follow-up", notes: "Diabetes management review" },
     { id: "APT-102", patientId: "P004", patientName: "Michael Lee", doctorId: "D001", doctorName: "Dr. David Chen", department: "Internal Medicine", date: "2026-03-10", time: "09:45", duration: 45, status: "scheduled", type: "consultation" },
@@ -159,8 +146,6 @@ export const mockFrontdeskAppointments: Appointment[] = [
     { id: "APT-108", patientId: "P008", patientName: "David Park", doctorId: "D002", doctorName: "Dr. Sarah Kim", department: "Cardiology", date: "2026-03-11", time: "10:30", duration: 45, status: "scheduled", type: "procedure", notes: "Echocardiogram" },
 ];
 
-// ── Duplicate candidates ──────────────────────────────────────────────
-
 export const mockDuplicates: DuplicateCandidate[] = [
     {
         patientA: { id: "P-NEW", mrn: "", firstName: "Emily", lastName: "Johnson", dateOfBirth: "1985-03-15", phone: "+1-555-9999" },
@@ -169,8 +154,6 @@ export const mockDuplicates: DuplicateCandidate[] = [
         matchReasons: ["Exact name match", "Exact date of birth", "Similar address"],
     },
 ];
-
-// ── Consent documents ─────────────────────────────────────────────────
 
 export const mockConsents: ConsentDocument[] = [
     { id: "CON-001", patientId: "P001", type: "general", signedAt: "2026-01-10T08:35:00", signedBy: "Emily Johnson", status: "signed" },

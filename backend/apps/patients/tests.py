@@ -6,7 +6,6 @@ from rest_framework.test import APITestCase
 from apps.authentication.models import User, UserRole, UserStatus
 from apps.patients.models import Appointment, AppointmentStatus, Gender, Patient
 
-
 class FrontDeskCheckInSmokeTest(APITestCase):
     def setUp(self):
         self.front_desk = User.objects.create_user(

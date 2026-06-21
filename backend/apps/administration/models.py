@@ -7,7 +7,6 @@ import uuid
 from django.db import models
 from django.conf import settings
 
-
 class DepartmentType(models.TextChoices):
     CLINICAL = "clinical", "Clinical"
     DIAGNOSTIC = "diagnostic", "Diagnostic"
@@ -17,11 +16,9 @@ class DepartmentType(models.TextChoices):
     SUPPORT = "support", "Support"
     PHARMACY = "pharmacy", "Pharmacy"
 
-
 class DepartmentStatus(models.TextChoices):
     ACTIVE = "active", "Active"
     INACTIVE = "inactive", "Inactive"
-
 
 class Department(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -47,7 +44,6 @@ class Department(models.Model):
     def __str__(self):
         return self.name
 
-
 class WardType(models.TextChoices):
     GENERAL = "general", "General"
     ICU = "icu", "ICU"
@@ -62,12 +58,10 @@ class WardType(models.TextChoices):
     OBSERVATION = "observation", "Observation"
     ISOLATION = "isolation", "Isolation"
 
-
 class WardStatus(models.TextChoices):
     ACTIVE = "active", "Active"
     INACTIVE = "inactive", "Inactive"
     MAINTENANCE = "maintenance", "Maintenance"
-
 
 class Ward(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -95,7 +89,6 @@ class Ward(models.Model):
     def __str__(self):
         return self.name
 
-
 class BedType(models.TextChoices):
     STANDARD = "standard", "Standard"
     GENERAL = "general", "General"
@@ -110,14 +103,12 @@ class BedType(models.TextChoices):
     DAY_SURGERY = "day-surgery", "Day Surgery"
     RECOVERY = "recovery", "Recovery"
 
-
 class BedStatus(models.TextChoices):
     AVAILABLE = "available", "Available"
     OCCUPIED = "occupied", "Occupied"
     RESERVED = "reserved", "Reserved"
     MAINTENANCE = "maintenance", "Maintenance"
     CLEANING = "cleaning", "Cleaning"
-
 
 class Bed(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -141,9 +132,6 @@ class Bed(models.Model):
     def __str__(self):
         return f"Bed {self.number} ({self.ward.name})"
 
-
-# ─── Catalogs ─────────────────────────────────────────────────────────────────
-
 class LabCatalogItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=50, unique=True)
@@ -163,7 +151,6 @@ class LabCatalogItem(models.Model):
 
     def __str__(self):
         return f"{self.code} - {self.name}"
-
 
 class RadiologyCatalogItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -187,7 +174,6 @@ class RadiologyCatalogItem(models.Model):
     def __str__(self):
         return f"{self.code} - {self.name}"
 
-
 class ServiceCatalogItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=50, unique=True)
@@ -206,9 +192,6 @@ class ServiceCatalogItem(models.Model):
 
     def __str__(self):
         return f"{self.code} - {self.name}"
-
-
-# ─── Audit Log (immutable) ────────────────────────────────────────────────────
 
 class AuditLog(models.Model):
     """Immutable HIPAA audit trail. Retained >= 6 years."""
@@ -242,7 +225,6 @@ class AuditLog(models.Model):
             models.Index(fields=["resource", "timestamp"]),
             models.Index(fields=["action"]),
         ]
-        # Prevent updates and deletes at the model level (enforced by service layer)
 
     def save(self, *args, **kwargs):
         if self.pk and AuditLog.objects.filter(pk=self.pk).exists():
@@ -254,9 +236,6 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.action} - {self.resource} - {self.timestamp:%Y-%m-%d %H:%M}"
-
-
-# ─── System Settings ──────────────────────────────────────────────────────────
 
 class SystemSetting(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -274,9 +253,6 @@ class SystemSetting(models.Model):
 
     def __str__(self):
         return self.key
-
-
-# ─── Role Permissions ─────────────────────────────────────────────────────────
 
 class RolePermission(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

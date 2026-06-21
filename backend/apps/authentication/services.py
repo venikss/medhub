@@ -15,7 +15,6 @@ from .models import RefreshTokenRecord, User, UserStatus
 
 logger = logging.getLogger(__name__)
 
-
 class AuthService:
     @staticmethod
     def _token_expiry(token) -> datetime:

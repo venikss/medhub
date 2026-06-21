@@ -32,12 +32,10 @@ from .serializers import (
     WoundSerializer, HandoffSerializer, DischargeChecklistSerializer,
 )
 
-
 NursingReadWritePermission = ReadWriteRolePermission.for_roles(
     [UserRole.NURSE, UserRole.DOCTOR],
     [UserRole.NURSE],
 )
-
 
 def _trigger_news2_cdss(vitals, patient_id, user):
     if vitals.news2_score and vitals.news2_score >= 5:
@@ -67,11 +65,6 @@ def _trigger_news2_cdss(vitals, patient_id, user):
             "summary": rec.summary,
             "targetRoles": rec.target_roles,
         }, target_roles=rec.target_roles)
-
-
-# ---------------------------------------------------------------------------
-# Vitals
-# ---------------------------------------------------------------------------
 
 class VitalsListCreateView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
@@ -106,7 +99,6 @@ class VitalsListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class VitalsDetailView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
 
@@ -116,7 +108,6 @@ class VitalsDetailView(APIView):
         except Vitals.DoesNotExist:
             raise NotFoundError("Vitals record not found.")
         return Response(VitalsSerializer(v, context={"request": request}).data)
-
 
 class VitalsLatestView(APIView):
     """
@@ -129,11 +120,6 @@ class VitalsLatestView(APIView):
         if not vitals:
             raise NotFoundError("No vitals found for this patient.")
         return Response(VitalsSerializer(vitals, context={"request": request}).data)
-
-
-# ---------------------------------------------------------------------------
-# Intake/Output
-# ---------------------------------------------------------------------------
 
 class IntakeOutputListCreateView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
@@ -157,7 +143,6 @@ class IntakeOutputListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class IntakeOutputDetailView(APIView):
     """
     FIX: DELETE /io/:id â€” was completely missing.
@@ -176,11 +161,6 @@ class IntakeOutputDetailView(APIView):
     def delete(self, request, pk):
         self._get(pk).delete()
         return Response({"message": "IO record deleted."}, status=status.HTTP_204_NO_CONTENT)
-
-
-# ---------------------------------------------------------------------------
-# Pain Assessment
-# ---------------------------------------------------------------------------
 
 class PainAssessmentListCreateView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
@@ -204,11 +184,6 @@ class PainAssessmentListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
-# ---------------------------------------------------------------------------
-# MAR
-# ---------------------------------------------------------------------------
-
 class MARListView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
 
@@ -223,7 +198,6 @@ class MARListView(APIView):
         return paginator.get_paginated_response(
             MAREntrySerializer(page, many=True, context={"request": request}).data
         )
-
 
 class MARAdministerView(APIView):
     permission_classes = [IsAuthenticated, IsNurse]
@@ -246,7 +220,6 @@ class MARAdministerView(APIView):
             {"action": "administer"}, AuditSeverity.HIGH,
         )
         return Response(MAREntrySerializer(entry, context={"request": request}).data)
-
 
 class MARStatusView(APIView):
     """
@@ -283,11 +256,6 @@ class MARStatusView(APIView):
         )
         return Response(MAREntrySerializer(entry, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Nursing Notes
-# ---------------------------------------------------------------------------
-
 class NursingNoteListCreateView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
 
@@ -304,7 +272,6 @@ class NursingNoteListCreateView(APIView):
     def post(self, request):
         serializer = NursingNoteSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        # Set edit_deadline to 4 hours from now
         from datetime import timedelta
         note = serializer.save(
             nurse=request.user,
@@ -314,7 +281,6 @@ class NursingNoteListCreateView(APIView):
             NursingNoteSerializer(note, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
 
 class NursingNoteDetailView(APIView):
     permission_classes = [IsAuthenticated, IsNurse]
@@ -345,11 +311,6 @@ class NursingNoteDetailView(APIView):
         note.delete()
         return Response({"message": "Note deleted."}, status=status.HTTP_204_NO_CONTENT)
 
-
-# ---------------------------------------------------------------------------
-# Tasks
-# ---------------------------------------------------------------------------
-
 class TaskListCreateView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
 
@@ -378,7 +339,6 @@ class TaskListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class TaskDetailView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
 
@@ -401,7 +361,6 @@ class TaskDetailView(APIView):
             updated_task.save(update_fields=["completed_time", "completed_by"])
         return Response(TaskSerializer(updated_task, context={"request": request}).data)
 
-
 class TaskCompleteView(APIView):
     """
     FIX: PUT /tasks/:id/complete â€” dedicated complete endpoint was missing.
@@ -421,11 +380,6 @@ class TaskCompleteView(APIView):
         task.completion_notes = request.data.get("completionNotes", "")
         task.save(update_fields=["status", "completed_time", "completed_by", "completion_notes"])
         return Response(TaskSerializer(task, context={"request": request}).data)
-
-
-# ---------------------------------------------------------------------------
-# Wounds
-# ---------------------------------------------------------------------------
 
 class WoundListCreateView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
@@ -449,7 +403,6 @@ class WoundListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class WoundDetailView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
 
@@ -471,7 +424,6 @@ class WoundDetailView(APIView):
         serializer.save()
         return Response(WoundSerializer(wound, context={"request": request}).data)
 
-
 class WoundPhotoView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
     parser_classes = [MultiPartParser]
@@ -486,15 +438,9 @@ class WoundPhotoView(APIView):
             raise ValidationAppError("No file provided.")
         validate_file(f, allowed_types=["image/jpeg", "image/png"])
         result = upload_file(f, "wound-photos", f.name)
-        # Store in description field if no dedicated photo_url field exists on model
         wound.description = wound.description + f"\n[photo:{result['fileUrl']}]"
         wound.save(update_fields=["description"])
         return Response({"photoUrl": result["fileUrl"]})
-
-
-# ---------------------------------------------------------------------------
-# Handoffs
-# ---------------------------------------------------------------------------
 
 class HandoffListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsNurse]
@@ -520,7 +466,6 @@ class HandoffListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class HandoffAcknowledgeView(APIView):
     permission_classes = [IsAuthenticated, IsNurse]
 
@@ -535,17 +480,10 @@ class HandoffAcknowledgeView(APIView):
         handoff.save(update_fields=["to_nurse"])
         return Response(HandoffSerializer(handoff, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Discharge Checklist
-# FIX: path now uses patient_id instead of admission_id per spec
-# ---------------------------------------------------------------------------
-
 class DischargeChecklistView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]
 
     def get(self, request, patient_id):
-        # Auto-populate standard checklist items on first access
         from apps.doctors.views import _auto_populate_discharge_checklist
         _auto_populate_discharge_checklist(patient_id)
 
@@ -557,7 +495,6 @@ class DischargeChecklistView(APIView):
         )
 
     def post(self, request, patient_id):
-        # Verify patient exists
         from apps.patients.models import Patient
         if not Patient.objects.filter(id=patient_id).exists():
             raise NotFoundError("Patient not found.")
@@ -568,7 +505,6 @@ class DischargeChecklistView(APIView):
             DischargeChecklistSerializer(item, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
 
 class DischargeChecklistItemView(APIView):
     permission_classes = [IsAuthenticated, NursingReadWritePermission]

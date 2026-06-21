@@ -184,9 +184,74 @@ export interface DoctorPatientChart {
   cdss: DoctorChartCdssItem[];
 }
 
+export interface LabTestResultItem {
+  id: string;
+  panelId: string;
+  patientId?: string;
+  patientName?: string;
+  testCode?: string;
+  testName: string;
+  value?: string;
+  unit?: string;
+  referenceRange?: string;
+  flag?: string;
+  isCritical?: boolean;
+  previousValue?: string;
+  delta?: string;
+  deltaFlag?: string;
+  comment?: string;
+  analyzedAt?: string;
+  status?: string;
+  verifiedByName?: string;
+  verifiedAt?: string;
+}
+
+export interface LabReportFromAPI {
+  id: string;
+  patientId: string;
+  patientName?: string;
+  mrn?: string;
+  panelId: string;
+  panelName?: string;
+  results: LabTestResultItem[];
+  orderedBy?: string;
+  orderedAt?: string;
+  authorizedBy?: string;
+  authorizedAt?: string;
+  releasedByName?: string;
+  releasedAt?: string;
+  status?: string;
+  hasCritical?: boolean;
+  criticalNotifiedTo?: string;
+  notes?: string;
+}
+
+export interface RadiologyReportFromAPI {
+  id: string;
+  patientId?: string;
+  patientName?: string;
+  mrn?: string;
+  examName?: string;
+  modality?: string;
+  orderId?: string;
+  accessionNumber?: string;
+  indication?: string;
+  technique?: string;
+  findings?: string;
+  impression?: string;
+  recommendations?: string;
+  addendum?: string;
+  hasCritical?: boolean;
+  status?: string;
+  signedAt?: string;
+  radiologist?: string;
+  examDate?: string;
+  createdAt?: string;
+}
+
 export interface DoctorResultsInbox {
-  labResults: DoctorChartResult[];
-  radiologyReports: DoctorChartResult[];
+  labResults: LabReportFromAPI[];
+  radiologyReports: RadiologyReportFromAPI[];
 }
 
 function normalizeDoctorOrderPriority(priority: string) {
@@ -317,6 +382,13 @@ export function signDoctorEncounter(encounterId: string, token?: string) {
   }).then(mapEncounter);
 }
 
+export function deleteDoctorEncounter(encounterId: string, token?: string) {
+  return apiFetch<void>(`/doctors/encounters/${encounterId}/`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function listDoctorPrescriptions(
   query: { patientId?: string; encounterId?: string } = {},
   token?: string,
@@ -366,6 +438,18 @@ export function createDoctorDiagnosis(
     method: "POST",
     token,
     body: JSON.stringify(payload),
+  }) as Promise<DoctorChartDiagnosis>;
+}
+
+export function updateDiagnosisStatus(
+  diagnosisId: string,
+  newStatus: "active" | "resolved" | "chronic" | "suspected",
+  token?: string,
+) {
+  return apiFetch(`/doctors/diagnoses/${diagnosisId}/status/`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify({ status: newStatus }),
   }) as Promise<DoctorChartDiagnosis>;
 }
 

@@ -2,7 +2,6 @@ from django import forms
 
 from .models import Patient
 
-
 class PatientAdminForm(forms.ModelForm):
     address_line1 = forms.CharField(required=False, label="Address line 1")
     address_line2 = forms.CharField(required=False, label="Address line 2")

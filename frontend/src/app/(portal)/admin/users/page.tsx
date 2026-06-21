@@ -121,7 +121,6 @@ export default function UsersPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // Dialog state
   const [formOpen, setFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [form, setForm] = useState<UserFormState>(EMPTY_FORM);

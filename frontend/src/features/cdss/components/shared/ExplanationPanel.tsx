@@ -13,10 +13,8 @@ import {
 } from "@/features/cdss/constants";
 import type { CDSSRecommendation, CDSSEvidenceSourceType, CDSSConfidenceLevel } from "@/types";
 
-// ── Confidence Meter ──────────────────────────────────────────────────────────
-
 function ConfidenceMeter({ score, level }: { score: number; level: CDSSConfidenceLevel }) {
-  const cfg = CONFIDENCE_METER[level];
+  const cfg = CONFIDENCE_METER[level] ?? CONFIDENCE_METER["low"];
   const circumference = 2 * Math.PI * 15.9;
   const dashArray = `${(score / 100) * circumference} ${circumference}`;
   return (
@@ -45,8 +43,6 @@ function ConfidenceMeter({ score, level }: { score: number; level: CDSSConfidenc
   );
 }
 
-// ── Flag Icons ────────────────────────────────────────────────────────────────
-
 function FlagIcon({ flag }: { flag?: string }) {
   if (!flag || flag === "normal") return <Minus className="h-3 w-3 text-muted-foreground" />;
   if (flag === "high")     return <TrendingUp className="h-3 w-3 text-amber-600" />;
@@ -62,14 +58,10 @@ const FLAG_ROW: Record<string, string> = {
   normal:   "",
 };
 
-// ── Source-type icon helper ───────────────────────────────────────────────────
-
 function SourceIcon({ sourceType }: { sourceType: CDSSEvidenceSourceType }) {
   const Icon = SOURCE_ICONS[sourceType] ?? BookOpen;
   return <Icon className="h-4 w-4 shrink-0" />;
 }
-
-// ── Main Component ────────────────────────────────────────────────────────────
 
 interface ExplanationPanelProps {
   rec: CDSSRecommendation;
@@ -82,15 +74,14 @@ interface ExplanationPanelProps {
 export function ExplanationPanel({ rec }: ExplanationPanelProps) {
   const { evidenceSources, suggestedActions } = rec;
 
-  // Defensive defaults — older records and AI-generated alerts may have
-  // partial or empty explanation JSON from different source modules.
   const explanation = rec.explanation ?? {};
   const reasoning: string[]      = Array.isArray(explanation.reasoning)      ? explanation.reasoning      : explanation.reasoning ? [String(explanation.reasoning)] : [];
   const limitations: string[]    = Array.isArray(explanation.limitations)    ? explanation.limitations    : [];
   const clinicalInputs: {label: string; value: string; flag?: string}[] =
     Array.isArray(explanation.clinicalInputs) ? explanation.clinicalInputs : [];
   const summary: string          = explanation.summary   ?? rec.summary ?? "";
-  const confidence               = explanation.confidence ?? "low";
+  const _rawConf                 = explanation.confidence ?? "low";
+  const confidence               = (["high", "moderate", "low"] as const).includes(_rawConf) ? _rawConf as CDSSConfidenceLevel : "low";
   const confidenceScore: number  = typeof explanation.confidenceScore === "number" ? explanation.confidenceScore : 0;
   const modelVersion: string | undefined = explanation.modelVersion;
 

@@ -1,7 +1,6 @@
 ﻿from django.contrib import admin
 from apps.authentication.models import UserRole
 
-
 class RoleRestrictedAdminMixin:
     required_role = None
     view_roles = ()
@@ -28,11 +27,8 @@ class RoleRestrictedAdminMixin:
     def has_delete_permission(self, request, obj=None):
         return self._can_edit(request)
 
-
-
 from .forms import ImagingOrderAdminForm
 from .models import ImagingOrder, ImagingStudy, RadiologyReport, RadCriticalFinding, ModalitySchedule
-
 
 @admin.register(ImagingOrder)
 class ImagingOrderAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
@@ -52,7 +48,6 @@ class ImagingOrderAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
         ("Audit", {"fields": ("created_at", "updated_at")} ),
     )
 
-
     def get_readonly_fields(self, request, obj=None):
         fields = list(super().get_readonly_fields(request, obj))
         if obj:
@@ -63,7 +58,6 @@ class ImagingOrderAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
         if not obj.ordered_by_id and getattr(request.user, "role", None) == UserRole.DOCTOR:
             obj.ordered_by = request.user
         super().save_model(request, obj, form, change)
-
 
 @admin.register(ImagingStudy)
 class ImagingStudyAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
@@ -80,7 +74,6 @@ class ImagingStudyAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
             obj.patient = obj.order.patient
         super().save_model(request, obj, form, change)
 
-
 @admin.register(RadiologyReport)
 class RadiologyReportAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     required_role = UserRole.RADIOLOGIST
@@ -96,7 +89,6 @@ class RadiologyReportAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
         if obj.status in ("final", "addendum") and not obj.signed_by_id and getattr(request.user, "role", None) == UserRole.RADIOLOGIST:
             obj.signed_by = request.user
         super().save_model(request, obj, form, change)
-
 
 @admin.register(RadCriticalFinding)
 class RadCriticalFindingAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
@@ -116,7 +108,6 @@ class RadCriticalFindingAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
             obj.acknowledged_by = request.user
         super().save_model(request, obj, form, change)
 
-
 @admin.register(ModalitySchedule)
 class ModalityScheduleAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     required_role = UserRole.RADIOLOGIST
@@ -125,13 +116,4 @@ class ModalityScheduleAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     list_filter = ["modality", "status", "date"]
     search_fields = ["room", "exam_name", "patient__mrn", "patient__first_name", "patient__last_name"]
     autocomplete_fields = ["patient"]
-
-
-
-
-
-
-
-
-
 

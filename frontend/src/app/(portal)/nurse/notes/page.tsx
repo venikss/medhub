@@ -11,13 +11,13 @@ import { createNursingNote, listNursePatients, listNursingNotes, listWounds, typ
 import type { NursingNoteCategory, NursingNote, WoundNote } from "@/types";
 import { cn } from "@/lib/utils";
 
-const categories: { key: NursingNoteCategory | "wound" | "all"; label: string; emoji: string }[] = [
-  { key: "all", label: "All", emoji: "📋" },
-  { key: "assessment", label: "Assessment", emoji: "🩺" },
-  { key: "care", label: "Care", emoji: "🩹" },
-  { key: "education", label: "Education", emoji: "📖" },
-  { key: "communication", label: "Communication", emoji: "📞" },
-  { key: "wound", label: "Wound/Device", emoji: "🩹" },
+const categories: { key: NursingNoteCategory | "wound" | "all"; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "assessment", label: "Assessment" },
+  { key: "care", label: "Care" },
+  { key: "education", label: "Education" },
+  { key: "communication", label: "Communication" },
+  { key: "wound", label: "Wound/Device" },
 ];
 
 const templates = [
@@ -207,7 +207,7 @@ export default function NursingNotesPage() {
                   : "border-border/50 bg-muted/50 text-muted-foreground hover:bg-muted",
               )}
             >
-              <span>{category.emoji}</span> {category.label}
+              {category.label}
             </button>
           ))}
         </div>
@@ -262,7 +262,7 @@ export default function NursingNotesPage() {
           <div key={note.id} className="rounded-lg border border-orange-500/30 bg-orange-500/[0.05] p-3">
             <div className="mb-1.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-[10px] capitalize text-orange-700">🩹 {note.type}</Badge>
+                <Badge variant="outline" className="text-[10px] capitalize text-orange-700">{note.type}</Badge>
                 <span className="text-sm font-medium">{note.patientName}</span>
                 <span className="text-xs text-muted-foreground">{note.location}</span>
               </div>

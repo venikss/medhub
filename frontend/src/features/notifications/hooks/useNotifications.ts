@@ -232,7 +232,6 @@ export function useNotifications() {
     };
 
     socket.onerror = () => {
-      // Connection errors are handled via onclose + reconnect logic.
     };
 
     return () => {

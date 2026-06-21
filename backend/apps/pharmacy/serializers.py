@@ -12,13 +12,11 @@ from .models import (
     DispenseRecord, PharmacyIntervention, Refill, Substitution,
 )
 
-
 PRIORITY_CHOICES = [
     ("routine", "Routine"),
     ("urgent", "Urgent"),
     ("stat", "STAT"),
 ]
-
 
 def resolve_canonical_medication_name(*, local_name: str | None, generic_name: str | None, rxnorm_code: str | None) -> str | None:
     if rxnorm_code:
@@ -31,7 +29,6 @@ def resolve_canonical_medication_name(*, local_name: str | None, generic_name: s
         if concept and concept.display:
             return concept.display
     return generic_name or local_name
-
 
 class PharmacyPrescriptionSerializer(serializers.ModelSerializer):
     priority = serializers.ChoiceField(choices=PRIORITY_CHOICES, required=False)
@@ -90,6 +87,7 @@ class PharmacyPrescriptionSerializer(serializers.ModelSerializer):
             "sig": original.sig if original else None,
             "prescribedBy": original.prescribed_by.get_full_name() if original and original.prescribed_by_id else None,
             "prescribedAt": original.created_at.isoformat() if original and original.created_at else None,
+            "encounterId": str(original.encounter_id) if original and original.encounter_id else None,
             "allergies": instance.patient.allergies if hasattr(instance, "patient") else [],
             "status": data["status"],
             "setting": data["setting"],
@@ -136,7 +134,6 @@ class DrugWarningSerializer(serializers.ModelSerializer):
             "resolved": data["resolved"],
             "createdAt": data["created_at"],
         }
-
 
 class FormularyItemSerializer(serializers.ModelSerializer):
     ndc = serializers.CharField(required=False, allow_null=True, allow_blank=True)
@@ -200,7 +197,6 @@ class FormularyItemSerializer(serializers.ModelSerializer):
             "updatedAt": data["updated_at"],
         }
 
-
 class DispenseRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = DispenseRecord
@@ -251,9 +247,7 @@ class DispenseRecordSerializer(serializers.ModelSerializer):
             "createdAt": data["created_at"],
         }
 
-
 class PharmacyInterventionSerializer(serializers.ModelSerializer):
-    # prescriber_contact is auto-filled from the prescription's doctor — not required from the caller.
     prescriber_contact = serializers.CharField(required=False, allow_blank=True, default="")
 
     class Meta:
@@ -288,7 +282,6 @@ class PharmacyInterventionSerializer(serializers.ModelSerializer):
             "resolvedAt": data["resolved_at"],
             "createdAt": data["created_at"],
         }
-
 
 class RefillSerializer(serializers.ModelSerializer):
     class Meta:
@@ -329,7 +322,6 @@ class RefillSerializer(serializers.ModelSerializer):
             "createdAt": data["created_at"],
         }
 
-
 class SubstitutionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Substitution
@@ -338,7 +330,6 @@ class SubstitutionSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        # On updates, don't overwrite the original requester
         if self.instance:
             attrs.pop("requested_by", None)
         return attrs

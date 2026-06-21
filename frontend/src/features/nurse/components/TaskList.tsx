@@ -15,9 +15,9 @@ interface TaskListProps {
   onComplete?: (taskId: string) => Promise<void>;
 }
 
-const typeIcons: Record<string, string> = {
-  vitals: "💓", medication: "💊", assessment: "🩺", "wound-care": "🩹",
-  "io-check": "💧", ambulation: "🚶", education: "📋", discharge: "📤", other: "📝",
+const typeLabels: Record<string, string> = {
+  vitals: "VS", medication: "Meds", assessment: "Assess", "wound-care": "Wound",
+  "io-check": "I&O", ambulation: "Ambul", education: "Edu", discharge: "Disch", other: "Other",
 };
 
 const priorityColors: Record<string, string> = {
@@ -58,7 +58,7 @@ export function TaskList({ tasks, title = "Nursing Tasks", className, onComplete
                 "flex items-center gap-3 p-2.5 rounded-lg border transition-colors",
                 task.isOverdue ? "bg-red-500/[0.06] border-red-500/30" : task.status === "completed" ? "bg-muted/30 border-border/30 opacity-60" : "border-border/50 hover:bg-muted/40"
               )}>
-                <span className="text-sm shrink-0">{typeIcons[task.type] || "📝"}</span>
+                <span className="text-[10px] font-semibold text-muted-foreground shrink-0 uppercase tracking-wide">{typeLabels[task.type] ?? task.type}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className={cn("text-sm font-medium", task.isOverdue && "text-red-700")}>{task.description}</p>

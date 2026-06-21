@@ -2,12 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Filter, Link as LinkIcon, Search } from "lucide-react";
+import { AlertTriangle, Filter, Link as LinkIcon, Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import {
   listImagingOrders,
@@ -48,6 +57,16 @@ export default function OrdersBoardPage() {
   const [statusFilter, setStatus] = useState<ImagingStudyStatus | "all">("all");
   const [orders, setOrders] = useState<ImagingOrder[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const [protocolOpen, setProtocolOpen] = useState(false);
+  const [protocolNotes, setProtocolNotes] = useState("");
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState("");
+  const [scheduleRoom, setScheduleRoom] = useState("");
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -84,26 +103,45 @@ export default function OrdersBoardPage() {
 
   async function handleProtocol() {
     if (!selected) return;
-    const notes = window.prompt("Protocol notes (optional)", "") ?? "";
-    const updated = await protocolImagingOrder(selected.id, { protocolNotes: notes }, token ?? undefined);
-    setOrders((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    setBusy(true);
+    setActionError(null);
+    try {
+      const updated = await protocolImagingOrder(selected.id, { protocolNotes: protocolNotes || undefined }, token ?? undefined);
+      setOrders((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      setProtocolOpen(false);
+      setProtocolNotes("");
+    } catch (err: any) {
+      setActionError(err?.message ?? "Failed to protocol order.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleSchedule() {
-    if (!selected) return;
-    const scheduledAt = window.prompt("Scheduled time (ISO, e.g. 2026-04-12T10:30:00)", "");
-    if (!scheduledAt) return;
-    const scheduledRoom = window.prompt("Room (optional)", "") ?? "";
-    const updated = await scheduleImagingOrder(
-      selected.id,
-      { scheduledAt, scheduledRoom: scheduledRoom || undefined },
-      token ?? undefined,
-    );
-    setOrders((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    if (!selected || !scheduleAt) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      const updated = await scheduleImagingOrder(
+        selected.id,
+        { scheduledAt: new Date(scheduleAt).toISOString(), scheduledRoom: scheduleRoom || undefined },
+        token ?? undefined,
+      );
+      setOrders((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      setScheduleOpen(false);
+      setScheduleAt("");
+      setScheduleRoom("");
+    } catch (err: any) {
+      setActionError(err?.message ?? "Failed to schedule order.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleCheckIn() {
     if (!selected) return;
+    setBusy(true);
+    setActionError(null);
     try {
       await createImagingStudy(
         {
@@ -124,28 +162,131 @@ export default function OrdersBoardPage() {
       );
       setOrders(refreshed);
     } catch (err: any) {
-      alert(err?.message ?? "Failed to check in patient");
+      setActionError(err?.message ?? "Failed to check in patient.");
+    } finally {
+      setBusy(false);
     }
   }
 
   async function handleCancel() {
     if (!selected) return;
-    const reason = window.prompt("Cancellation reason", "");
-    if (reason === null) return;
+    setBusy(true);
+    setActionError(null);
     try {
       const updated = await cancelImagingOrder(
         selected.id,
-        { reason: reason || undefined },
+        { reason: cancelReason || undefined },
         token ?? undefined,
       );
       setOrders((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      setCancelOpen(false);
+      setCancelReason("");
     } catch (err: any) {
-      alert(err?.message ?? "Failed to cancel order");
+      setActionError(err?.message ?? "Failed to cancel order.");
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <div className="flex h-full flex-1 flex-col gap-4 overflow-hidden p-4 pt-0">
+      {/* Protocol Dialog */}
+      <Dialog open={protocolOpen} onOpenChange={setProtocolOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Protocol Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Protocol Notes (optional)</Label>
+              <Textarea
+                placeholder="Enter protocol notes…"
+                rows={3}
+                value={protocolNotes}
+                onChange={(e) => setProtocolNotes(e.target.value)}
+              />
+            </div>
+            {actionError && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" />{actionError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setProtocolOpen(false); setProtocolNotes(""); setActionError(null); }}>Cancel</Button>
+            <Button onClick={() => void handleProtocol()} disabled={busy}>{busy ? "Saving…" : "Confirm Protocol"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Dialog */}
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Schedule Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Date &amp; Time <span className="text-destructive">*</span></Label>
+              <Input
+                type="datetime-local"
+                value={scheduleAt}
+                onChange={(e) => setScheduleAt(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Room (optional)</Label>
+              <Input
+                placeholder="e.g. Room 3 – CT Suite"
+                value={scheduleRoom}
+                onChange={(e) => setScheduleRoom(e.target.value)}
+              />
+            </div>
+            {actionError && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" />{actionError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setScheduleOpen(false); setScheduleAt(""); setScheduleRoom(""); setActionError(null); }}>Cancel</Button>
+            <Button onClick={() => void handleSchedule()} disabled={busy || !scheduleAt}>{busy ? "Saving…" : "Confirm Schedule"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Dialog */}
+      <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              This will cancel the imaging order for <span className="font-semibold text-foreground">{selected?.patientName}</span> ({selected?.examName}). This action cannot be undone.
+            </p>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Reason (optional)</Label>
+              <Textarea
+                placeholder="Enter cancellation reason…"
+                rows={2}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+              />
+            </div>
+            {actionError && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" />{actionError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setCancelOpen(false); setCancelReason(""); setActionError(null); }}>Keep Order</Button>
+            <Button variant="destructive" onClick={() => void handleCancel()} disabled={busy}>{busy ? "Cancelling…" : "Cancel Order"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Orders Board</h1>
         <p className="text-sm text-muted-foreground">{filtered.length} orders</p>
@@ -316,19 +457,21 @@ export default function OrdersBoardPage() {
 
                 <div className="flex flex-wrap gap-2">
                   {selected.status === "ordered" && (
-                    <Button size="sm" onClick={() => void handleProtocol()}>Protocol Order</Button>
+                    <Button size="sm" onClick={() => { setActionError(null); setProtocolOpen(true); }}>Protocol Order</Button>
                   )}
                   {selected.status === "protocoled" && (
-                    <Button size="sm" onClick={() => void handleSchedule()}>Schedule</Button>
+                    <Button size="sm" onClick={() => { setActionError(null); setScheduleOpen(true); }}>Schedule</Button>
                   )}
                   {selected.status === "scheduled" && (
-                    <Button size="sm" onClick={() => void handleCheckIn()}>Check In Patient</Button>
+                    <Button size="sm" disabled={busy} onClick={() => void handleCheckIn()}>
+                      {busy ? "Checking in…" : "Check In Patient"}
+                    </Button>
                   )}
                   {["ordered", "protocoled", "scheduled", "arrived"].includes(selected.status) && (
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => void handleCancel()}
+                      onClick={() => { setActionError(null); setCancelOpen(true); }}
                     >
                       Cancel Order
                     </Button>
@@ -340,6 +483,11 @@ export default function OrdersBoardPage() {
                         View Report
                       </Button>
                     </Link>
+                  )}
+                  {actionError && (
+                    <p className="w-full text-xs text-destructive flex items-center gap-1 mt-1">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />{actionError}
+                    </p>
                   )}
                 </div>
               </CardContent>

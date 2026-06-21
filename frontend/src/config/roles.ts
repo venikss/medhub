@@ -16,7 +16,7 @@ interface RoleMeta {
     label: string;
     icon: LucideIcon;
     defaultRoute: string;
-    color: string; // Tailwind color class
+    color: string;
     description: string;
 }
 
@@ -28,19 +28,19 @@ export const roleMeta: Record<UserRole, RoleMeta> = {
         color: "text-violet-500",
         description: "System administration & configuration",
     },
+    [UserRole.PATIENT]: {
+        label: "Patient",
+        icon: User,
+        defaultRoute: "/",
+        color: "text-sky-500",
+        description: "Patient portal (disabled)",
+    },
     [UserRole.DOCTOR]: {
         label: "Doctor",
         icon: Stethoscope,
         defaultRoute: "/doctor",
         color: "text-teal-500",
         description: "Clinical care & patient management",
-    },
-    [UserRole.PATIENT]: {
-        label: "Patient",
-        icon: User,
-        defaultRoute: "/patient",
-        color: "text-sky-500",
-        description: "Personal health dashboard",
     },
     [UserRole.NURSE]: {
         label: "Nurse",

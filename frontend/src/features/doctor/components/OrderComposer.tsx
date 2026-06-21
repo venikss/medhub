@@ -23,12 +23,11 @@ const categories: { key: OrderCategory; icon: typeof FlaskConical; label: string
 
 const commonOrders: Record<OrderCategory, string[]> = {
   lab: ["CBC with Diff", "BMP", "CMP", "Lipid Panel", "HbA1c", "TSH", "Troponin I", "PT/INR", "Urinalysis", "Blood Culture"],
-  imaging: [], // handled by ImagingExamCombobox
+  imaging: [],
   consult: ["Cardiology", "Neurology", "Surgery", "Pulmonology", "Nephrology", "Endocrinology", "Psychiatry"],
   procedure: [],
 };
 
-// ── Modality badge colours mirroring ModalityBadge ──
 const MODALITY_STYLE: Record<ImagingModality, { bg: string; text: string; label: string }> = {
   XR: { bg: "bg-sky-500/10", text: "text-sky-700", label: "XR" },
   CT: { bg: "bg-violet-500/10", text: "text-violet-700", label: "CT" },
@@ -104,7 +103,6 @@ export function OrderComposer({ patientId, patientName, onSubmit, className }: O
     addToCart(value);
   };
 
-  // Called when user picks an exam from the imaging combobox
   const handleImagingExamSelect = (exam: ImagingExamSelection) => {
     setSelectedExam(exam);
   };

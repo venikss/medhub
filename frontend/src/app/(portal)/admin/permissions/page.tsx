@@ -191,7 +191,6 @@ export default function PermissionsPage() {
           if (permissions.length > 0) {
             setMatrix(buildMatrix(permissions));
           } else {
-            // No permissions saved yet — seed with backend-enforced defaults
             setMatrix(buildDefaultMatrix());
             setDirty(true);
           }

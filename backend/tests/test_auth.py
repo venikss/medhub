@@ -8,7 +8,6 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 
-
 def make_user(role="doctor", email=None, password="Test@1234"):
     from apps.authentication.models import User
     email = email or f"{role}_{id(object())}@test.com"
@@ -21,7 +20,6 @@ def make_user(role="doctor", email=None, password="Test@1234"):
         status="active",
     )
     return user
-
 
 @pytest.mark.django_db
 class TestLogin:
@@ -57,7 +55,6 @@ class TestLogin:
         }, format="json")
         assert resp.status_code in (status.HTTP_400_BAD_REQUEST, status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
-
 @pytest.mark.django_db
 class TestJWTRoleEnforcement:
     def setup_method(self):
@@ -77,7 +74,6 @@ class TestJWTRoleEnforcement:
         user = make_user(role="doctor", email="doc3@test.com")
         headers = self._auth_header(user)
         resp = self.client.get("/api/v1/doctors/encounters/", **headers)
-        # Should return 200 or 404 (empty), not 403
         assert resp.status_code != status.HTTP_403_FORBIDDEN
 
     def test_nurse_cannot_access_doctor_endpoint_if_restricted(self):
@@ -85,8 +81,6 @@ class TestJWTRoleEnforcement:
         make_user(role="doctor", email="dr.sign@test.com")
         nurse = make_user(role="nurse", email="nurse.sign@test.com")
         headers = self._auth_header(nurse)
-        # POST to sign an encounter — requires doctor role
-        # Using a non-existent UUID to test permission, not 404
         resp = self.client.post(
             "/api/v1/doctors/encounters/00000000-0000-0000-0000-000000000001/sign/",
             **headers,
@@ -96,7 +90,6 @@ class TestJWTRoleEnforcement:
     def test_unauthenticated_request_fails(self):
         resp = self.client.get("/api/v1/patients/")
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
-
 
 @pytest.mark.django_db
 class TestTokenRefresh:

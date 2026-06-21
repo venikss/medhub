@@ -10,10 +10,8 @@ from channels.layers import get_channel_layer
 
 logger = logging.getLogger(__name__)
 
-
 def _now_iso() -> str:
     return datetime.now(tz=timezone.utc).isoformat()
-
 
 def _normalize_payload(event: str, payload: dict | None) -> dict:
     payload = dict(payload or {})
@@ -98,7 +96,6 @@ def _normalize_payload(event: str, payload: dict | None) -> dict:
 
     return payload
 
-
 def broadcast(group: str, event: str, payload: dict):
     """
     Broadcast a WebSocket event to a channel group via Redis pub/sub.
@@ -117,10 +114,6 @@ def broadcast(group: str, event: str, payload: dict):
     except Exception as exc:
         logger.error("WebSocket broadcast failed [%s / %s]: %s", group, event, exc)
 
-
-# ─── Role-based group names ───────────────────────────────────────────────────
-# Each role has its own channel group. Users join their role group on connect.
-
 ROLE_GROUP_MAP = {
     "admin":         "role_admin",
     "doctor":        "role_doctor",
@@ -133,7 +126,6 @@ ROLE_GROUP_MAP = {
     "patient":       "role_patient",
 }
 
-
 def broadcast_to_roles(roles: list | None, event: str, payload: dict):
     """Send an event to multiple role groups."""
     for role in roles or []:
@@ -141,13 +133,9 @@ def broadcast_to_roles(roles: list | None, event: str, payload: dict):
         if group:
             broadcast(group, event, payload)
 
-
 def broadcast_to_user(user_id: str, event: str, payload: dict):
     """Send an event to a specific user group."""
     broadcast(f"user_{user_id}", event, payload)
-
-
-# ─── Convenience broadcast helpers per spec ──────────────────────────────────
 
 def emit_cdss_new_recommendation(payload: dict, user_id: str = None, target_roles: list | None = None):
     if user_id:
@@ -158,7 +146,6 @@ def emit_cdss_new_recommendation(payload: dict, user_id: str = None, target_role
             roles = ["doctor", "nurse", "lab_tech", "radiologist", "pharmacist"]
         broadcast_to_roles(roles, "cdss.new_recommendation", payload)
 
-
 def emit_cdss_recommendation_updated(payload: dict, user_id: str = None, target_roles: list | None = None):
     if user_id:
         broadcast_to_user(user_id, "cdss.recommendation_updated", payload)
@@ -168,13 +155,11 @@ def emit_cdss_recommendation_updated(payload: dict, user_id: str = None, target_
             roles = ["doctor", "nurse", "lab_tech", "radiologist", "pharmacist"]
         broadcast_to_roles(roles, "cdss.recommendation_updated", payload)
 
-
 def emit_lab_critical_result(payload: dict, user_id: str = None):
     if user_id:
        broadcast_to_user(user_id, "lab.critical_result", payload)
     else:
        broadcast_to_roles(["doctor", "nurse", "lab_tech"], "lab.critical_result", payload)
-
 
 def emit_lab_result_released(payload: dict, user_id: str = None):
     if user_id:
@@ -182,13 +167,11 @@ def emit_lab_result_released(payload: dict, user_id: str = None):
     else:
         broadcast_to_roles(["doctor"], "lab.result_released", payload)
 
-
 def emit_radiology_critical_finding(payload: dict, user_id: str = None):
     if user_id:
         broadcast_to_user(user_id, "radiology.critical_finding", payload)
     else:
         broadcast_to_roles(["doctor", "nurse", "radiologist"], "radiology.critical_finding", payload)
-
 
 def emit_radiology_report_signed(payload: dict, user_id: str = None):
     if user_id:
@@ -196,13 +179,11 @@ def emit_radiology_report_signed(payload: dict, user_id: str = None):
     else:
         broadcast_to_roles(["doctor"], "radiology.report_signed", payload)
 
-
 def emit_adt_admission(payload: dict, user_id: str = None):
     if user_id:
         broadcast_to_user(user_id, "adt.admission", payload)
     else:
         broadcast_to_roles(["doctor", "nurse", "front_desk"], "adt.admission", payload)
-
 
 def emit_adt_discharge(payload: dict, user_id: str = None):
     if user_id:
@@ -210,16 +191,13 @@ def emit_adt_discharge(payload: dict, user_id: str = None):
     else:
         broadcast_to_roles(["doctor", "nurse", "front_desk"], "adt.discharge", payload)
 
-
 def emit_adt_bed_available(payload: dict):
     broadcast_to_roles(["front_desk", "nurse"], "adt.bed_available", payload)
-
 
 def emit_queue_ticket_called(payload: dict, patient_id: str = None):
     broadcast_to_roles(["front_desk"], "queue.ticket_called", payload)
     if patient_id:
         broadcast(f"patient_{patient_id}", "queue.ticket_called", payload)
-
 
 def emit_pharmacy_rx_verified(payload: dict, user_id: str = None):
     if user_id:
@@ -227,18 +205,15 @@ def emit_pharmacy_rx_verified(payload: dict, user_id: str = None):
     else:
         broadcast_to_roles(["doctor", "nurse"], "pharmacy.rx_verified", payload)
 
-
 def emit_pharmacy_rx_dispensed(payload: dict, user_id: str = None):
     if user_id:
         broadcast_to_user(user_id, "pharmacy.rx_dispensed", payload)
     else:
         broadcast_to_roles(["nurse"], "pharmacy.rx_dispensed", payload)
 
-
 def emit_pharmacy_new_prescription(payload: dict):
     """Notify pharmacists when a doctor creates or updates a prescription."""
     broadcast_to_roles(["pharmacist"], "pharmacy.new_prescription", payload)
-
 
 def emit_pharmacy_rx_rejected(payload: dict, prescriber_id: str = None):
     """Notify the prescribing doctor that their Rx was rejected."""
@@ -247,14 +222,12 @@ def emit_pharmacy_rx_rejected(payload: dict, prescriber_id: str = None):
     else:
         broadcast_to_roles(["doctor"], "pharmacy.rx_rejected", payload)
 
-
 def emit_pharmacy_rx_on_hold(payload: dict, prescriber_id: str = None):
     """Notify the prescribing doctor that their Rx was put on hold."""
     if prescriber_id:
         broadcast_to_user(prescriber_id, "pharmacy.rx_on_hold", payload)
     else:
         broadcast_to_roles(["doctor"], "pharmacy.rx_on_hold", payload)
-
 
 def emit_pharmacy_intervention_created(payload: dict, prescriber_id: str = None):
     """Notify the prescribing doctor of a new pharmacist intervention."""
@@ -263,14 +236,12 @@ def emit_pharmacy_intervention_created(payload: dict, prescriber_id: str = None)
     else:
         broadcast_to_roles(["doctor"], "pharmacy.intervention_created", payload)
 
-
 def emit_pharmacy_substitution_proposed(payload: dict, prescriber_id: str = None):
     """Notify the prescribing doctor that a substitution has been proposed."""
     if prescriber_id:
         broadcast_to_user(prescriber_id, "pharmacy.substitution_proposed", payload)
     else:
         broadcast_to_roles(["doctor"], "pharmacy.substitution_proposed", payload)
-
 
 def emit_pharmacy_rx_cancelled(payload: dict, prescriber_id: str = None):
     """Notify the prescribing doctor that pharmacy cancelled their Rx."""
@@ -279,11 +250,9 @@ def emit_pharmacy_rx_cancelled(payload: dict, prescriber_id: str = None):
     else:
         broadcast_to_roles(["doctor"], "pharmacy.rx_cancelled", payload)
 
-
 def emit_pharmacy_prescription_discontinued(payload: dict):
     """Notify pharmacists when a doctor discontinues or expires a prescription."""
     broadcast_to_roles(["pharmacist"], "pharmacy.prescription_discontinued", payload)
-
 
 def emit_pharmacy_substitution_approved(payload: dict, prescriber_id: str = None):
     """Notify the prescribing doctor that their substitution was approved."""
@@ -291,7 +260,6 @@ def emit_pharmacy_substitution_approved(payload: dict, prescriber_id: str = None
         broadcast_to_user(prescriber_id, "pharmacy.substitution_approved", payload)
     else:
         broadcast_to_roles(["doctor"], "pharmacy.substitution_approved", payload)
-
 
 def emit_pharmacy_substitution_rejected(payload: dict, prescriber_id: str = None):
     """Notify the prescribing doctor that their substitution was rejected."""

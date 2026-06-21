@@ -31,23 +31,17 @@ from apps.cdss.models import MedicalOntologyMapping, OntologyDomain, OntologyCod
 
 from .models import (
     Encounter, Diagnosis, Order, Prescription, Referral,
-    EncounterStatus, PrescriptionStatus, ReferralStatus, OrderStatus, OrderCategory,
+    EncounterStatus, DiagnosisStatus, PrescriptionStatus, ReferralStatus, OrderStatus, OrderCategory,
 )
 from .serializers import (
     EncounterSerializer, DiagnosisSerializer, OrderSerializer,
     PrescriptionSerializer, ReferralSerializer,
 )
 
-
 DoctorReadWritePermission = ReadWriteRolePermission.for_roles(
     [UserRole.DOCTOR, UserRole.ADMIN],
     [UserRole.DOCTOR],
 )
-
-
-# ---------------------------------------------------------------------------
-# Encounters
-# ---------------------------------------------------------------------------
 
 class EncounterListCreateView(APIView):
     permission_classes = [IsAuthenticated, DoctorReadWritePermission]
@@ -77,7 +71,6 @@ class EncounterListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class EncounterDetailView(APIView):
     permission_classes = [IsAuthenticated, DoctorReadWritePermission]
     serializer_class = EncounterSerializer
@@ -95,7 +88,6 @@ class EncounterDetailView(APIView):
 
     def put(self, request, pk):
         encounter = self._get(pk)
-        # Use status field to determine if signed (no is_signed boolean on model)
         if encounter.status == EncounterStatus.SIGNED and request.user != encounter.doctor:
             raise ConflictError("Signed encounters can only be amended by the signing doctor.")
         serializer = EncounterSerializer(
@@ -105,6 +97,19 @@ class EncounterDetailView(APIView):
         serializer.save()
         return Response(EncounterSerializer(encounter, context={"request": request}).data)
 
+    def delete(self, request, pk):
+        encounter = self._get(pk)
+        if encounter.status == EncounterStatus.SIGNED:
+            raise ConflictError("Signed encounters cannot be deleted.")
+        if encounter.doctor != request.user:
+            raise ConflictError("Only the doctor who created this encounter can delete it.")
+        write_audit_log(
+            request, AuditAction.DELETE, "Encounter", str(encounter.id),
+            {"patientId": str(encounter.patient_id), "status": encounter.status},
+        )
+        encounter.delete()
+        from rest_framework import status as drf_status
+        return Response(status=drf_status.HTTP_204_NO_CONTENT)
 
 class EncounterSignView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor]
@@ -128,7 +133,6 @@ class EncounterSignView(APIView):
             {"action": "sign"}, AuditSeverity.HIGH,
         )
         return Response(EncounterSerializer(encounter, context={"request": request}).data)
-
 
 class EncounterAmendView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor]
@@ -160,11 +164,6 @@ class EncounterAmendView(APIView):
         )
         return Response(EncounterSerializer(encounter, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Diagnoses
-# ---------------------------------------------------------------------------
-
 class DiagnosisListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor]
     serializer_class = DiagnosisSerializer
@@ -189,7 +188,6 @@ class DiagnosisListCreateView(APIView):
             DiagnosisSerializer(diagnosis, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
 
 class DiagnosisDetailView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor]
@@ -217,6 +215,41 @@ class DiagnosisDetailView(APIView):
         self._get(pk).delete()
         return Response({"message": "Diagnosis deleted."}, status=status.HTTP_204_NO_CONTENT)
 
+class DiagnosisStatusView(APIView):
+    """PATCH /diagnoses/<pk>/status/ — update only the status field and sync Neo4j."""
+    permission_classes = [IsAuthenticated, IsDoctor]
+
+    _ALLOWED = {DiagnosisStatus.ACTIVE, DiagnosisStatus.RESOLVED, DiagnosisStatus.CHRONIC, DiagnosisStatus.SUSPECTED}
+
+    def patch(self, request, pk):
+        try:
+            diag = Diagnosis.objects.select_related("patient").get(id=pk)
+        except Diagnosis.DoesNotExist:
+            raise NotFoundError("Diagnosis not found.")
+
+        new_status = request.data.get("status", "").strip()
+        if new_status not in self._ALLOWED:
+            raise ValidationAppError(
+                f"status must be one of: {', '.join(sorted(self._ALLOWED))}"
+            )
+
+        if diag.status == new_status:
+            return Response(DiagnosisSerializer(diag, context={"request": request}).data)
+
+        diag.status = new_status
+        diag.save(update_fields=["status", "updated_at"])
+        write_audit_log(
+            request, AuditAction.UPDATE, "Diagnosis", str(diag.id),
+            {"status": new_status},
+        )
+
+        try:
+            from apps.cdss.services.graph_sync_service import GraphSyncService
+            GraphSyncService.sync_diagnosis(diag)
+        except Exception:
+            pass
+
+        return Response(DiagnosisSerializer(diag, context={"request": request}).data)
 
 class ICD10SearchView(APIView):
     permission_classes = [IsAuthenticated, DoctorReadWritePermission]
@@ -240,7 +273,6 @@ class ICD10SearchView(APIView):
         except Exception:
             results = []
         return Response({"data": results})
-
 
 class DiagnosisCatalogSearchView(APIView):
     permission_classes = [IsAuthenticated, DoctorReadWritePermission]
@@ -285,7 +317,6 @@ class DiagnosisCatalogSearchView(APIView):
         data = list(grouped.values())[:20]
         return Response({"data": data})
 
-
 def _sync_pharmacy_prescription_from_doctor_rx(rx):
     setting = RxSetting.OUTPATIENT
     if rx.encounter_id and getattr(rx.encounter, "visit_type", None) == "inpatient":
@@ -300,7 +331,6 @@ def _sync_pharmacy_prescription_from_doctor_rx(rx):
             "status": (RxStatus.CANCELLED if rx.status in {PrescriptionStatus.DISCONTINUED, PrescriptionStatus.EXPIRED} else RxStatus.PENDING_VERIFICATION),
         },
     )
-    # Notify pharmacists of the new/updated prescription in real time
     medication = getattr(rx, "medication", "") or ""
     patient_name = rx.patient.full_name if rx.patient else ""
     emit_pharmacy_new_prescription({
@@ -313,12 +343,6 @@ def _sync_pharmacy_prescription_from_doctor_rx(rx):
     })
     return pharmacy_rx
 
-
-# ---------------------------------------------------------------------------
-# Nursing cross-module sync helpers
-# ---------------------------------------------------------------------------
-
-# Map prescription frequency text → number of daily administrations
 _FREQUENCY_MAP = {
     "once daily": 1, "daily": 1, "qd": 1, "od": 1,
     "twice daily": 2, "bid": 2, "bd": 2, "b.i.d.": 2,
@@ -332,7 +356,6 @@ _FREQUENCY_MAP = {
     "stat": 1, "once": 1,
 }
 
-# Default administration times per frequency count
 _ADMIN_TIMES = {
     1: [(8, 0)],
     2: [(8, 0), (20, 0)],
@@ -341,21 +364,17 @@ _ADMIN_TIMES = {
     6: [(0, 0), (4, 0), (8, 0), (12, 0), (16, 0), (20, 0)],
 }
 
-
 def _sync_mar_entries_from_prescription(rx):
     """Create MAR entries for a prescription based on its frequency and date range."""
     from datetime import datetime, timedelta
     from apps.nurses.models import MAREntry, MARStatus
 
-    # Determine how many times per day
     freq_text = (rx.frequency or "").strip().lower()
     times_per_day = _FREQUENCY_MAP.get(freq_text, 1)
 
-    # PRN / as-needed — no scheduled entries
     if times_per_day == 0:
         return
 
-    # Cancelled / discontinued → delete any future scheduled entries
     if rx.status in {PrescriptionStatus.DISCONTINUED, PrescriptionStatus.EXPIRED}:
         MAREntry.objects.filter(
             prescription=rx,
@@ -364,12 +383,11 @@ def _sync_mar_entries_from_prescription(rx):
         ).delete()
         return
 
-    # Only create for active prescriptions
     if rx.status != "active":
         return
 
     start = rx.start_date or timezone.now().date()
-    end = rx.end_date or (start + timedelta(days=6))  # default 7 days
+    end = rx.end_date or (start + timedelta(days=6))
 
     admin_times = _ADMIN_TIMES.get(times_per_day, [(8, 0)])
     current = start
@@ -393,13 +411,11 @@ def _sync_mar_entries_from_prescription(rx):
 
     return entries_created
 
-
 def _create_nursing_task_from_order(order):
     """Create a nursing task when a doctor places an order."""
     from datetime import timedelta
     from apps.nurses.models import Task, TaskStatus as NurseTaskStatus
 
-    # Only create tasks for non-cancelled, pending orders
     if order.status in {OrderStatus.CANCELLED, OrderStatus.COMPLETED, OrderStatus.RESULTED}:
         return None
 
@@ -422,7 +438,6 @@ def _create_nursing_task_from_order(order):
     _PRIORITY_MAP = {"stat": "urgent", "urgent": "high", "routine": "normal", "asap": "high"}
     priority = _PRIORITY_MAP.get(order.priority, "normal")
 
-    # Avoid duplicates
     task, created = Task.objects.get_or_create(
         patient=order.patient,
         type=task_type,
@@ -436,14 +451,13 @@ def _create_nursing_task_from_order(order):
     )
     return task if created else None
 
-
 def _auto_populate_discharge_checklist(patient_id):
     """Create standard discharge checklist items for a patient if none exist."""
     from apps.nurses.models import DischargeChecklistItem
     from apps.patients.models import Patient
 
     if DischargeChecklistItem.objects.filter(patient_id=patient_id).exists():
-        return  # already populated
+        return
 
     if not Patient.objects.filter(id=patient_id).exists():
         return
@@ -475,7 +489,6 @@ def _auto_populate_discharge_checklist(patient_id):
     ]
     DischargeChecklistItem.objects.bulk_create(items)
 
-
 def _infer_imaging_modality(order_name):
     name = (order_name or "").lower()
     if "mri" in name:
@@ -495,7 +508,6 @@ def _infer_imaging_modality(order_name):
     if "nuclear" in name:
         return ImagingModality.NM
     return ImagingModality.XR
-
 
 def _infer_imaging_body_part(order_name):
     name = (order_name or "").lower()
@@ -519,7 +531,6 @@ def _infer_imaging_body_part(order_name):
         return "breast"
     return "other"
 
-
 def _match_radiology_catalog_item(order_name):
     if not order_name:
         return None
@@ -530,15 +541,12 @@ def _match_radiology_catalog_item(order_name):
         catalog_item = RadiologyCatalogItem.objects.filter(is_active=True, name__iexact=order_name).first()
     return catalog_item
 
-
 def _match_radiology_catalog_from_order(order):
     catalog_item = _match_radiology_catalog_item(getattr(order, "exam_code", None))
     if not catalog_item and getattr(order, "name", None):
         catalog_item = _match_radiology_catalog_item(order.name)
     return catalog_item
 
-
-# Map doctors.Order.specimen_type values → laboratory.SpecimenType values
 _DOCTOR_SPECIMEN_TO_LAB_SPECIMEN = {
     "blood":   LabSpecimenType.BLOOD,
     "urine":   LabSpecimenType.URINE,
@@ -549,7 +557,6 @@ _DOCTOR_SPECIMEN_TO_LAB_SPECIMEN = {
     "saliva":  LabSpecimenType.OTHER,
     "other":   LabSpecimenType.OTHER,
 }
-
 
 def _infer_lab_specimen_type(test_name):
     """Infer the most likely specimen type from the ordered test name."""
@@ -566,15 +573,13 @@ def _infer_lab_specimen_type(test_name):
         return LabSpecimenType.TISSUE
     if any(t in name for t in ["sputum", "bronchoalveolar", "bal"]):
         return LabSpecimenType.OTHER
-    return LabSpecimenType.BLOOD  # covers CBC, BMP, CMP, LFT, lipid, coagulation, etc.
-
+    return LabSpecimenType.BLOOD
 
 def _sync_lab_order_from_doctor_order(order):
     """Mirror a doctor lab Order into Specimen + LabPanel so lab staff see it on their worklist."""
     if order.category != OrderCategory.LAB:
         return None
 
-    # Resolve specimen type
     if order.specimen_type:
         lab_specimen_type = _DOCTOR_SPECIMEN_TO_LAB_SPECIMEN.get(
             order.specimen_type, LabSpecimenType.OTHER
@@ -584,7 +589,6 @@ def _sync_lab_order_from_doctor_order(order):
 
     is_cancelled = order.status == OrderStatus.CANCELLED
 
-    # Create or retrieve the specimen for this order
     specimen, specimen_created = LabSpecimen.objects.get_or_create(
         order=order,
         defaults={
@@ -594,7 +598,6 @@ def _sync_lab_order_from_doctor_order(order):
         },
     )
     if not specimen_created and specimen.status == LabSpecimenStatus.ORDERED:
-        # Safe to update type/status while specimen hasn't been collected yet
         specimen.type = lab_specimen_type
         specimen.status = LabSpecimenStatus.REJECTED if is_cancelled else LabSpecimenStatus.ORDERED
         specimen.save(update_fields=["type", "status"])
@@ -602,7 +605,6 @@ def _sync_lab_order_from_doctor_order(order):
         specimen.status = LabSpecimenStatus.REJECTED
         specimen.save(update_fields=["status"])
 
-    # Create or retrieve the lab panel for this order
     panel, panel_created = LabPanel.objects.get_or_create(
         order=order,
         defaults={
@@ -614,13 +616,11 @@ def _sync_lab_order_from_doctor_order(order):
         },
     )
     if not panel_created and panel.status == LabPanelStatus.PENDING:
-        # Reflect any edits the doctor made before lab tech picks it up
         panel.priority = order.priority
         panel.name = order.name
         panel.save(update_fields=["priority", "name"])
 
     return panel
-
 
 def _sync_radiology_order_from_doctor_order(order):
     if order.category != OrderCategory.IMAGING:
@@ -647,11 +647,6 @@ def _sync_radiology_order_from_doctor_order(order):
     }
     rad_order, _ = ImagingOrder.objects.update_or_create(doctor_order=order, defaults=defaults)
     return rad_order
-
-
-# ---------------------------------------------------------------------------
-# Orders
-# ---------------------------------------------------------------------------
 
 class OrderListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor]
@@ -685,7 +680,6 @@ class OrderListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class OrderDetailView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor]
     serializer_class = OrderSerializer
@@ -710,7 +704,6 @@ class OrderDetailView(APIView):
         _sync_lab_order_from_doctor_order(order)
         return Response(OrderSerializer(order, context={"request": request}).data)
 
-    # FIX: spec requires DELETE /orders/:id — moved cancel here as DELETE
     def delete(self, request, pk):
         order = self._get(pk)
         validate_status_transition(
@@ -727,17 +720,12 @@ class OrderDetailView(APIView):
         )
         reason = request.data.get("reason", "") if hasattr(request, "data") else ""
         order.status = OrderStatus.CANCELLED
-        order.completed_at = timezone.now()  # reuse completed_at as cancelled_at timestamp
+        order.completed_at = timezone.now()
         order.notes = reason if reason else order.notes
         order.save(update_fields=["status", "completed_at", "notes"])
         _sync_radiology_order_from_doctor_order(order)
         _sync_lab_order_from_doctor_order(order)
         return Response(OrderSerializer(order, context={"request": request}).data)
-
-
-# ---------------------------------------------------------------------------
-# Prescriptions
-# ---------------------------------------------------------------------------
 
 class PrescriptionListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor]
@@ -766,7 +754,6 @@ class PrescriptionListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class PrescriptionDetailView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor]
     serializer_class = PrescriptionSerializer
@@ -790,7 +777,6 @@ class PrescriptionDetailView(APIView):
         _sync_pharmacy_prescription_from_doctor_rx(rx)
         _sync_mar_entries_from_prescription(rx)
         return Response(PrescriptionSerializer(rx, context={"request": request}).data)
-
 
 class PrescriptionStatusView(APIView):
     """
@@ -841,11 +827,6 @@ class PrescriptionStatusView(APIView):
         )
         return Response(PrescriptionSerializer(rx, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Referrals
-# ---------------------------------------------------------------------------
-
 class ReferralListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor]
     serializer_class = ReferralSerializer
@@ -871,7 +852,6 @@ class ReferralListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class ReferralDetailView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor]
     serializer_class = ReferralSerializer
@@ -893,7 +873,6 @@ class ReferralDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(ReferralSerializer(referral, context={"request": request}).data)
-
 
 class ReferralStatusView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor]
@@ -919,11 +898,6 @@ class ReferralStatusView(APIView):
         referral.status = new_status
         referral.save(update_fields=["status"])
         return Response(ReferralSerializer(referral, context={"request": request}).data)
-
-
-# ---------------------------------------------------------------------------
-# Results Inbox — FIX: path must be GET /doctors/:id/results
-# ---------------------------------------------------------------------------
 
 class DoctorResultsInboxView(APIView):
     """
@@ -965,7 +939,6 @@ class DoctorResultsInboxView(APIView):
             ).data,
         })
 
-
 class ResultReviewView(APIView):
     """
     FIX: PUT /results/:id/review — was completely missing.
@@ -994,7 +967,6 @@ class ResultReviewView(APIView):
             {"action": "review", "reviewedBy": str(request.user.id)},
         )
         return Response(LabTestResultSerializer(result, context={"request": request}).data)
-
 
 class DoctorPatientChartView(APIView):
     permission_classes = [IsAuthenticated, IsClinicalStaff]

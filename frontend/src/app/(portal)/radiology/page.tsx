@@ -17,6 +17,9 @@ import { StatCard } from "@/components/molecules/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { type RadiologyDashboardResponse, getRadiologyDashboard, notifyCriticalFinding, acknowledgeCriticalFinding, listCriticalFindings } from "@/features/radiology/api";
@@ -29,6 +32,12 @@ export default function RadiologyPage() {
   const user = useAuthStore((state) => state.user);
   const [dashboard, setDashboard] = useState<RadiologyDashboardResponse | null>(null);
   const [criticals, setCriticals] = useState<CriticalFinding[]>([]);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notifyTargetId, setNotifyTargetId] = useState("");
+  const [notifiedTo, setNotifiedTo] = useState("");
+  const [callbackNumber, setCallbackNumber] = useState("");
+  const [notifyBusy, setNotifyBusy] = useState(false);
+  const [notifyError, setNotifyError] = useState<string | null>(null);
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
 
   useEffect(() => {
@@ -66,16 +75,34 @@ export default function RadiologyPage() {
     [criticals],
   );
 
-  function handleNotify(id: string) {
-    void notifyCriticalFinding(id, { notifiedTo: user?.id ?? "" }, token ?? undefined)
-      .then((updated) => {
-        setCriticals((prev) =>
-          prev.map((finding) => (finding.id === id ? updated : finding)),
-        );
-      })
-      .catch((err) => {
-        console.error("Failed to notify critical finding:", err);
-      });
+  function openNotifyDialog(id: string) {
+    setNotifyTargetId(id);
+    setNotifiedTo("");
+    setCallbackNumber("");
+    setNotifyError(null);
+    setNotifyOpen(true);
+  }
+
+  async function handleNotifyConfirm() {
+    if (!notifiedTo.trim()) {
+      setNotifyError("Physician name is required.");
+      return;
+    }
+    setNotifyBusy(true);
+    setNotifyError(null);
+    try {
+      const updated = await notifyCriticalFinding(
+        notifyTargetId,
+        { notifiedTo: notifiedTo.trim(), callbackNumber: callbackNumber.trim() || undefined },
+        token ?? undefined,
+      );
+      setCriticals((prev) => prev.map((f) => (f.id === notifyTargetId ? updated : f)));
+      setNotifyOpen(false);
+    } catch (err: any) {
+      setNotifyError(err?.message ?? "Failed to notify.");
+    } finally {
+      setNotifyBusy(false);
+    }
   }
 
   function handleAcknowledge(id: string) {
@@ -91,6 +118,46 @@ export default function RadiologyPage() {
   }
 
   return (
+    <>
+      <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Notify Critical Finding</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="dash-notifiedTo">Notified to <span className="text-destructive">*</span></Label>
+              <Input
+                id="dash-notifiedTo"
+                placeholder="Physician name"
+                value={notifiedTo}
+                onChange={(e) => setNotifiedTo(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="dash-callbackNumber">Callback number</Label>
+              <Input
+                id="dash-callbackNumber"
+                placeholder="Optional"
+                value={callbackNumber}
+                onChange={(e) => setCallbackNumber(e.target.value)}
+              />
+            </div>
+            {notifyError && (
+              <p className="flex items-center gap-1 text-xs text-destructive">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />{notifyError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotifyOpen(false)} disabled={notifyBusy}>Cancel</Button>
+            <Button onClick={() => void handleNotifyConfirm()} disabled={notifyBusy}>
+              {notifyBusy ? "Notifying…" : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
       <div className="flex items-center justify-between">
         <div>
@@ -109,7 +176,7 @@ export default function RadiologyPage() {
             <CriticalFindingBanner
               key={finding.id}
               finding={finding}
-              onNotify={handleNotify}
+              onNotify={openNotifyDialog}
               onAcknowledge={handleAcknowledge}
             />
           ))}
@@ -227,5 +294,6 @@ export default function RadiologyPage() {
         ))}
       </div>
     </div>
+    </>
   );
 }

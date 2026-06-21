@@ -8,13 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/atoms/StatusBadge";
 import { PatientBanner } from "@/features/doctor/components/PatientBanner";
-import { DiagnosisCatalogCombobox } from "@/features/doctor/components/DiagnosisCatalogCombobox";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
-import { createDoctorDiagnosis, getDoctorPatientChart, type DiagnosisCatalogOption, type DoctorChartResult, type DoctorPatientChart } from "@/features/doctor/api";
+import { getDoctorPatientChart, updateDiagnosisStatus, type DoctorChartResult, type DoctorPatientChart } from "@/features/doctor/api";
 import { DoctorCDSSPanel } from "@/features/cdss/components/modules/DoctorCDSSPanel";
 import { PatientReportPanel } from "@/features/cdss/components/shared/PatientReportPanel";
 import { PatientChatPanel } from "@/features/cdss/components/shared/PatientChatPanel";
 import { useCDSSDataHydration } from "@/features/cdss/hooks/useCDSSDataHydration";
+import { useAIAssistantStore } from "@/features/ai-assistant/store";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -57,13 +57,13 @@ function toBannerPatient(chart: DoctorPatientChart) {
 export default function PatientChartPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const token = useAuthStore((state) => state.token);
+  const setActivePatient = useAIAssistantStore((s) => s.setActivePatient);
   const [activeTab, setActiveTab] = useState<string>("summary");
   const [chart, setChart] = useState<DoctorPatientChart | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedDiagnosis, setSelectedDiagnosis] = useState<DiagnosisCatalogOption | null>(null);
-  const [savingDiagnosis, setSavingDiagnosis] = useState(false);
-  const [diagnosisMessage, setDiagnosisMessage] = useState<string | null>(null);
+  const [diagnosesState, setDiagnosesState] = useState<DoctorPatientChart["diagnoses"]>([]);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
   const { error: cdssFeedMessage } = useCDSSDataHydration({
     token,
     patientId: id,
@@ -80,8 +80,10 @@ export default function PatientChartPage({ params }: { params: Promise<{ id: str
       .then((data) => {
         if (!cancelled) {
           setChart(data);
+          setDiagnosesState(data.diagnoses);
           setNotFound(false);
           setLoadError(null);
+          setActivePatient(id, `${data.patient.firstName} ${data.patient.lastName}`.trim());
         }
       })
       .catch((error) => {
@@ -97,7 +99,7 @@ export default function PatientChartPage({ params }: { params: Promise<{ id: str
     return () => {
       cancelled = true;
     };
-  }, [id, token]);
+  }, [id, token, setActivePatient]);
 
   const patient = useMemo(() => (chart ? toBannerPatient(chart) : null), [chart]);
 
@@ -113,7 +115,20 @@ export default function PatientChartPage({ params }: { params: Promise<{ id: str
   }
 
   const patientEncounters = chart.encounters;
-  const patientDiagnoses = chart.diagnoses;
+  const patientDiagnoses = diagnosesState.length > 0 ? diagnosesState : chart.diagnoses;
+
+  async function handleResolveDiagnosis(diagnosisId: string) {
+    setResolvingId(diagnosisId);
+    try {
+      const updated = await updateDiagnosisStatus(diagnosisId, "resolved", token ?? undefined);
+      setDiagnosesState((prev) =>
+        prev.map((d) => (d.id === diagnosisId ? { ...d, status: updated.status } : d))
+      );
+    } catch {
+    } finally {
+      setResolvingId(null);
+    }
+  }
   const patientOrders = chart.orders;
   const patientMeds = chart.prescriptions;
   const patientResults: DoctorChartResult[] = [
@@ -122,37 +137,6 @@ export default function PatientChartPage({ params }: { params: Promise<{ id: str
   ];
   const flagColors: Record<string, string> = { normal: "text-emerald-600", high: "text-amber-600", low: "text-sky-600", critical: "text-red-600" };
   const flagBg: Record<string, string> = { normal: "bg-emerald-500/10 border-emerald-500/30", high: "bg-amber-500/10 border-amber-500/30", low: "bg-sky-500/10 border-sky-500/30", critical: "bg-red-500/10 border-red-500/30" };
-
-  async function handleAddDiagnosis() {
-    if (!selectedDiagnosis?.icd10Code) {
-      setDiagnosisMessage("Select a diagnosis with an ICD-10 code first.");
-      return;
-    }
-    setSavingDiagnosis(true);
-    setDiagnosisMessage(null);
-    try {
-      await createDoctorDiagnosis(
-        {
-          patientId: id,
-          icdCode: selectedDiagnosis.icd10Code,
-          description: selectedDiagnosis.label,
-          diagnosisType: "primary",
-          status: "active",
-          snomedCode: selectedDiagnosis.snomedCode ?? undefined,
-          snomedDisplay: selectedDiagnosis.snomedDisplay ?? selectedDiagnosis.label,
-        },
-        token ?? undefined,
-      );
-      const refreshed = await getDoctorPatientChart(id, token ?? undefined);
-      setChart(refreshed);
-      setSelectedDiagnosis(null);
-      setDiagnosisMessage("Diagnosis added from ontology catalog.");
-    } catch (error) {
-      setDiagnosisMessage(error instanceof Error ? error.message : "Failed to add diagnosis.");
-    } finally {
-      setSavingDiagnosis(false);
-    }
-  }
 
   return (
     <div className="space-y-4">
@@ -202,24 +186,6 @@ export default function PatientChartPage({ params }: { params: Promise<{ id: str
               <Card className="border-border/50 shadow-sm overflow-visible">
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Active Diagnoses</CardTitle></CardHeader>
                 <CardContent>
-                  <div className="mb-4 rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Ontology Catalog</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Search real coded diagnoses like diabetes, hypertension, or myocardial infarction and add them with ICD-10 and SNOMED attached.
-                    </p>
-                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                      <DiagnosisCatalogCombobox
-                        value={selectedDiagnosis}
-                        onSelect={setSelectedDiagnosis}
-                        onClear={() => setSelectedDiagnosis(null)}
-                        className="flex-1"
-                      />
-                      <Button size="sm" onClick={() => void handleAddDiagnosis()} disabled={savingDiagnosis || !selectedDiagnosis}>
-                        {savingDiagnosis ? "Adding…" : "Add Diagnosis"}
-                      </Button>
-                    </div>
-                    {diagnosisMessage && <p className="mt-2 text-xs text-muted-foreground">{diagnosisMessage}</p>}
-                  </div>
                   {patientDiagnoses.length === 0 ? <p className="text-xs text-muted-foreground">No diagnoses recorded.</p> : (
                     <div className="space-y-2">
                       {patientDiagnoses.map((diagnosis) => (
@@ -228,6 +194,15 @@ export default function PatientChartPage({ params }: { params: Promise<{ id: str
                           <span className="text-sm flex-1">{diagnosis.description}</span>
                           <Badge variant="secondary" className="text-[10px] capitalize">{diagnosis.diagnosisType ?? diagnosis.type ?? "diagnosis"}</Badge>
                           <StatusBadge status={diagnosis.status} />
+                          {diagnosis.status === "active" || diagnosis.status === "suspected" ? (
+                            <button
+                              onClick={() => handleResolveDiagnosis(diagnosis.id)}
+                              disabled={resolvingId === diagnosis.id}
+                              className="text-[10px] text-muted-foreground hover:text-emerald-600 disabled:opacity-50 underline underline-offset-2 shrink-0"
+                            >
+                              {resolvingId === diagnosis.id ? "Saving…" : "Mark resolved"}
+                            </button>
+                          ) : null}
                         </div>
                       ))}
                     </div>

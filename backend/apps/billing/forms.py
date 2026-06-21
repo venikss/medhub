@@ -4,7 +4,6 @@ from django import forms
 
 from .models import Invoice
 
-
 class InvoiceAdminForm(forms.ModelForm):
     insurance_provider = forms.CharField(required=False, label="Insurance provider")
     insurance_plan_name = forms.CharField(required=False, label="Insurance plan name")

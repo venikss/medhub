@@ -10,11 +10,9 @@ from core.exceptions import NotFoundError, ConflictError
 from core.utils import generate_mrn
 from .models import Patient, Admission, PatientStatus, AdmissionStatus
 
-
 class PatientService:
     @staticmethod
     def create_patient(data: dict) -> Patient:
-        # Prevent duplication
         first_name = data.get("first_name", "")
         last_name = data.get("last_name", "")
         date_of_birth = data.get("date_of_birth")
@@ -52,7 +50,6 @@ class PatientService:
             insurance_details=data.get("insurance_details", {}),
         )
 
-        # Integration: Create default consents
         from .models import Consent, ConsentStatus
         Consent.objects.create(patient=patient, type="general", status=ConsentStatus.PENDING)
         Consent.objects.create(patient=patient, type="financial", status=ConsentStatus.PENDING)
@@ -171,7 +168,6 @@ class PatientService:
             merge.save(update_fields=["deleted_at"])
         return keep
 
-
 class AdmissionService:
     @staticmethod
     def discharge(admission: Admission, data: dict, user) -> Admission:
@@ -199,7 +195,6 @@ class AdmissionService:
 
     @staticmethod
     def transfer(admission: Admission, data: dict, user):
-        # AdmissionTransfer lives in patients.models, not nurses
         from .models import AdmissionTransfer
         from apps.administration.models import Bed
 

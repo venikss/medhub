@@ -28,12 +28,10 @@ export default function AccessioningPage() {
   const [scanValue, setScanValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Dialog state
   const [testDialogOpen, setTestDialogOpen] = useState(false);
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
   const [pendingSpecimen, setPendingSpecimen] = useState<Specimen | null>(null);
 
-  // Toast/alert state
   const [alertDialog, setAlertDialog] = useState<{ open: boolean; title: string; message: string; variant?: "success" | "error" }>({ open: false, title: "", message: "" });
 
   useEffect(() => {
@@ -71,7 +69,6 @@ export default function AccessioningPage() {
     );
   });
 
-  // Common lab test catalog grouped by category
   const testCatalog: { category: string; tests: string[] }[] = [
     { category: "Hematology", tests: ["Complete Blood Count", "ESR", "Reticulocyte Count", "D-Dimer"] },
     { category: "Chemistry", tests: ["BMP \u2013 Renal Profile", "Liver Function Tests", "Lipid Panel", "HbA1c", "Fasting Blood Glucose", "Urine Microalbumin"] },
@@ -94,7 +91,6 @@ export default function AccessioningPage() {
       return;
     }
     setPendingSpecimen(specimen);
-    // Auto-select tests from the specimen's order
     setSelectedTests(specimen.testNames?.length ? [...specimen.testNames] : []);
     setTestDialogOpen(true);
   }

@@ -2,7 +2,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Pill, Clock, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import { Pill, Clock, RefreshCw, XCircle, CheckCircle2 } from "lucide-react";
+import { StatusBadge } from "@/components/atoms/StatusBadge";
 import type { PharmacyPrescription, RefillRecord } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +13,8 @@ interface MedicationProfileProps {
   patientName: string;
   allergies: AllergyEntry[];
   activeMeds: PharmacyPrescription[];
+  onHoldMeds?: PharmacyPrescription[];
+  historyMeds?: PharmacyPrescription[];
   refills: RefillRecord[];
   className?: string;
 }
@@ -21,7 +24,12 @@ function allergyLabel(a: AllergyEntry): string {
   return a.substance ?? a.reaction ?? JSON.stringify(a);
 }
 
-export function MedicationProfile({ patientName, allergies, activeMeds, refills, className }: MedicationProfileProps) {
+function formatDate(iso?: string | null) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" });
+}
+
+export function MedicationProfile({ patientName, allergies, activeMeds, onHoldMeds = [], historyMeds = [], refills, className }: MedicationProfileProps) {
   return (
     <Card className={cn("border-border/50 shadow-sm", className)}>
       <CardHeader className="pb-2">
@@ -39,9 +47,14 @@ export function MedicationProfile({ patientName, allergies, activeMeds, refills,
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+
         {/* Active medications */}
         <div>
-          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Active Medications</h4>
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+            Active Medications
+            <span className="font-normal normal-case text-[10px]">({activeMeds.length})</span>
+          </h4>
           <div className="space-y-1.5">
             {activeMeds.map((med) => (
               <div key={med.id} className="flex items-center gap-3 p-2 rounded-lg border border-border/50 hover:bg-muted/40 transition-colors">
@@ -49,9 +62,12 @@ export function MedicationProfile({ patientName, allergies, activeMeds, refills,
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium">{med.medication} {med.dosage}</p>
                   <p className="text-[10px] text-muted-foreground">{med.route} · {med.frequency} · {med.prescribedBy}</p>
+                  {med.prescribedAt && (
+                    <p className="text-[10px] text-muted-foreground">Started: {formatDate(med.prescribedAt)}</p>
+                  )}
                 </div>
                 <div className="text-right shrink-0">
-                  <Badge variant="outline" className="text-[10px] capitalize">{med.setting}</Badge>
+                  <StatusBadge status={med.status} />
                   <p className="text-[10px] text-muted-foreground mt-0.5">Refills: {med.refillsRemaining}/{med.refillsAllowed}</p>
                 </div>
               </div>
@@ -60,10 +76,78 @@ export function MedicationProfile({ patientName, allergies, activeMeds, refills,
           </div>
         </div>
 
+        {/* On-hold medications */}
+        {onHoldMeds.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-amber-500" />
+              On Hold
+              <span className="font-normal normal-case text-[10px]">({onHoldMeds.length})</span>
+            </h4>
+            <div className="space-y-1.5">
+              {onHoldMeds.map((med) => (
+                <div key={med.id} className="flex items-start gap-3 p-2 rounded-lg border border-amber-300/40 bg-amber-50/40">
+                  <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{med.medication} {med.dosage}</p>
+                    <p className="text-[10px] text-muted-foreground">{med.route} · {med.frequency} · {med.prescribedBy}</p>
+                    {((med as any).holdReason || med.notes) && (
+                      <p className="text-[10px] text-amber-700 mt-0.5">Hold reason: {(med as any).holdReason || med.notes}</p>
+                    )}
+                    {med.prescribedAt && (
+                      <p className="text-[10px] text-muted-foreground">Prescribed: {formatDate(med.prescribedAt)}</p>
+                    )}
+                  </div>
+                  <StatusBadge status={med.status} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Medication history (cancelled / returned) */}
+        {historyMeds.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <XCircle className="h-3 w-3 text-slate-400" />
+              Medication History
+              <span className="font-normal normal-case text-[10px]">({historyMeds.length})</span>
+            </h4>
+            <div className="space-y-1.5">
+              {historyMeds.map((med) => (
+                <div key={med.id} className="flex items-start gap-3 p-2 rounded-lg border border-border/30 bg-muted/20 opacity-80">
+                  <XCircle className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-muted-foreground">{med.medication} {med.dosage}</p>
+                    <p className="text-[10px] text-muted-foreground">{med.route} · {med.frequency} · {med.prescribedBy}</p>
+                    {((med as any).holdReason || med.notes) && (
+                      <p className="text-[10px] text-slate-500 mt-0.5">Reason: {(med as any).holdReason || med.notes}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-0.5">
+                      {med.prescribedAt && (
+                        <p className="text-[10px] text-muted-foreground">Ordered: {formatDate(med.prescribedAt)}</p>
+                      )}
+                      {(med.verifiedAt || med.dispensedAt) && (
+                        <p className="text-[10px] text-muted-foreground">
+                          Resolved: {formatDate(med.verifiedAt ?? med.dispensedAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <StatusBadge status={med.status} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Refill history */}
         {refills.length > 0 && (
           <div>
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Refill History</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <RefreshCw className="h-3 w-3" />
+              Refill History
+            </h4>
             <div className="space-y-1">
               {refills.map((rf) => (
                 <div key={rf.id} className="flex items-center gap-2 py-1.5 px-2 rounded text-xs border border-border/30 hover:bg-muted/30 transition-colors">

@@ -10,7 +10,6 @@ from django.db import models
 from django.conf import settings
 from core.models import TimeStampedModel
 
-
 class BillingInvoiceStatus(models.TextChoices):
     DRAFT = "draft", "Draft"
     SENT = "sent", "Sent"
@@ -21,7 +20,6 @@ class BillingInvoiceStatus(models.TextChoices):
     CLEARED = "cleared", "Cleared"
     VOID = "void", "Void"
 
-
 class Invoice(TimeStampedModel):
     patient = models.ForeignKey(
         "patients.Patient", on_delete=models.CASCADE, related_name="invoices"
@@ -31,8 +29,7 @@ class Invoice(TimeStampedModel):
         max_length=30, choices=BillingInvoiceStatus.choices, default=BillingInvoiceStatus.DRAFT
     )
     insurance_plan = models.JSONField(default=dict, blank=True)
-    charge_items = models.JSONField(default=list)  # ChargeItem[]
-    # Fixed: added primary_diagnosis — spec requires this field on Invoice
+    charge_items = models.JSONField(default=list)
     primary_diagnosis = models.CharField(max_length=500, blank=True, null=True)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     insurance_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -56,7 +53,6 @@ class Invoice(TimeStampedModel):
     def __str__(self):
         return f"Invoice - {self.patient.full_name} [{self.status}]"
 
-
 class ClaimStatus(models.TextChoices):
     DRAFT = "draft", "Draft"
     SUBMITTED = "submitted", "Submitted"
@@ -67,7 +63,6 @@ class ClaimStatus(models.TextChoices):
     DENIED = "denied", "Denied"
     APPEALED = "appealed", "Appealed"
     CLOSED = "closed", "Closed"
-
 
 class Claim(TimeStampedModel):
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="claims")
@@ -91,7 +86,6 @@ class Claim(TimeStampedModel):
     def __str__(self):
         return f"Claim {self.payer_id} - {self.patient.full_name}"
 
-
 class PaymentMethod(models.TextChoices):
     CASH = "cash", "Cash"
     CHECK = "check", "Check"
@@ -101,7 +95,6 @@ class PaymentMethod(models.TextChoices):
     INSURANCE = "insurance", "Insurance"
     WRITE_OFF = "write-off", "Write-Off"
     ADJUSTMENT = "adjustment", "Adjustment"
-
 
 class Payment(TimeStampedModel):
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="payments")
@@ -130,7 +123,6 @@ class Payment(TimeStampedModel):
     def __str__(self):
         return f"{self.amount} {self.method} - {self.patient.full_name}"
 
-
 class DenialStatus(models.TextChoices):
     OPEN = "open", "Open"
     IN_REVIEW = "in-review", "In Review"
@@ -138,7 +130,6 @@ class DenialStatus(models.TextChoices):
     OVERTURNED = "overturned", "Overturned"
     UPHELD = "upheld", "Upheld"
     WRITE_OFF = "write-off", "Write-Off"
-
 
 class DenialReasonCode(models.TextChoices):
     MISSING_INFO = "missing-info", "Missing Info"
@@ -150,7 +141,6 @@ class DenialReasonCode(models.TextChoices):
     CODING_ERROR = "coding-error", "Coding Error"
     OUT_OF_NETWORK = "out-of-network", "Out of Network"
     OTHER = "other", "Other"
-
 
 class Denial(TimeStampedModel):
     claim = models.ForeignKey(Claim, on_delete=models.CASCADE, related_name="denials")

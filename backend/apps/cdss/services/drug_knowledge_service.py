@@ -33,11 +33,7 @@ from apps.cdss.graph_models import (
 
 logger = logging.getLogger(__name__)
 
-
 class DrugKnowledgeService:
-    # ------------------------------------------------------------------
-    # Drug classes
-    # ------------------------------------------------------------------
     @staticmethod
     def ensure_drug_class(name: str, description: str = "", mechanism_of_action: str = "") -> DrugClassNode:
         node = DrugClassNode.nodes.get_or_none(name=name)
@@ -72,9 +68,6 @@ class DrugKnowledgeService:
         logger.info("Loaded %d drug classes into Neo4j.", len(class_map))
         return class_map
 
-    # ------------------------------------------------------------------
-    # Individual drugs
-    # ------------------------------------------------------------------
     @staticmethod
     def ensure_drug(entry: dict) -> MedicationNode:
         name = entry["name"]
@@ -107,7 +100,6 @@ class DrugKnowledgeService:
             node = cls.ensure_drug(entry)
             drug_map[entry["name"]] = node
 
-            # Connect to drug class node
             drug_class_name = entry.get("drug_class")
             if drug_class_name and drug_class_name in class_map:
                 class_node = class_map[drug_class_name]
@@ -117,9 +109,6 @@ class DrugKnowledgeService:
         logger.info("Loaded %d drugs into Neo4j.", len(drug_map))
         return drug_map
 
-    # ------------------------------------------------------------------
-    # Drug–Drug Interactions (bi-directional edge in Neo4j)
-    # ------------------------------------------------------------------
     @classmethod
     def load_ddi_pairs(cls, ddi_pairs: list[dict], drug_map: dict[str, MedicationNode]) -> int:
         loaded = 0
@@ -143,7 +132,6 @@ class DrugKnowledgeService:
                 "reference_source": pair.get("reference_source", ""),
             }
 
-            # Ensure A->B edge
             db.cypher_query(
                 """
                 MATCH (a:MedicationNode {name: $a}), (b:MedicationNode {name: $b})
@@ -161,7 +149,6 @@ class DrugKnowledgeService:
                     **rel_props,
                 },
             )
-            # Ensure B->A edge (symmetric — both directions for easy querying)
             db.cypher_query(
                 """
                 MATCH (a:MedicationNode {name: $a}), (b:MedicationNode {name: $b})
@@ -184,9 +171,6 @@ class DrugKnowledgeService:
         logger.info("Loaded %d DDI pairs into Neo4j.", loaded)
         return loaded
 
-    # ------------------------------------------------------------------
-    # Drug interaction risk groups
-    # ------------------------------------------------------------------
     @classmethod
     def load_interaction_groups(
         cls, groups: list[dict], drug_map: dict[str, MedicationNode]
@@ -215,7 +199,6 @@ class DrugKnowledgeService:
 
             group_map[entry["name"]] = node
 
-            # Connect member drugs to group
             for member_name in entry.get("members", []):
                 med_node = drug_map.get(member_name) or MedicationNode.nodes.get_or_none(name=member_name)
                 if med_node:
@@ -230,15 +213,13 @@ class DrugKnowledgeService:
         logger.info("Loaded %d drug interaction groups.", len(group_map))
         return group_map
 
-    # ------------------------------------------------------------------
-    # Allergen cross-reactivity groups
-    # ------------------------------------------------------------------
     @classmethod
     def load_allergen_groups(
         cls, allergen_groups: list[dict], drug_map: dict[str, MedicationNode]
     ) -> dict[str, AllergyCrossReactivityGroupNode]:
         group_map: dict[str, AllergyCrossReactivityGroupNode] = {}
         for entry in allergen_groups:
+            triggers_str = "|".join(entry.get("trigger_substances", []))
             node = AllergyCrossReactivityGroupNode.nodes.get_or_none(name=entry["name"])
             if not node:
                 node = AllergyCrossReactivityGroupNode(
@@ -246,6 +227,7 @@ class DrugKnowledgeService:
                     description=entry.get("description", ""),
                     reaction_types=entry.get("reaction_types", ""),
                     includes_classes=entry.get("includes_classes", ""),
+                    trigger_substances=triggers_str,
                 ).save()
             else:
                 changed = False
@@ -254,12 +236,14 @@ class DrugKnowledgeService:
                     if val and getattr(node, field) != val:
                         setattr(node, field, val)
                         changed = True
+                if triggers_str and node.trigger_substances != triggers_str:
+                    node.trigger_substances = triggers_str
+                    changed = True
                 if changed:
                     node.save()
 
             group_map[entry["name"]] = node
 
-            # Connect member drugs to allergen group
             for member_name in entry.get("members", []):
                 med_node = drug_map.get(member_name) or MedicationNode.nodes.get_or_none(name=member_name)
                 if med_node:
@@ -271,7 +255,6 @@ class DrugKnowledgeService:
                         {"med": member_name, "grp": entry["name"]},
                     )
 
-        # Wire cross-reacts-with edges between allergen groups
         for entry in allergen_groups:
             source_name = entry["name"]
             source_node = group_map.get(source_name)
@@ -290,12 +273,27 @@ class DrugKnowledgeService:
                         {"src": source_name, "tgt": target_name},
                     )
 
+        for entry in allergen_groups:
+            triggers = entry.get("trigger_substances", [])
+            if not triggers:
+                continue
+            all_triggers = list(set(triggers + entry.get("members", [])))
+            db.cypher_query(
+                """
+                MATCH (a:AllergyNode)
+                WHERE any(t IN $triggers WHERE
+                    toLower(a.name) = toLower(t) OR
+                    toLower(a.name) CONTAINS toLower(t) OR
+                    toLower(t) CONTAINS toLower(a.name))
+                MATCH (g:AllergyCrossReactivityGroupNode {name: $grp})
+                MERGE (a)-[:BELONGS_TO_ALLERGEN_GROUP]->(g)
+                """,
+                {"triggers": all_triggers, "grp": entry["name"]},
+            )
+
         logger.info("Loaded %d allergen cross-reactivity groups.", len(group_map))
         return group_map
 
-    # ------------------------------------------------------------------
-    # Patient-level DDI & allergy safety checks (used by AI agent)
-    # ------------------------------------------------------------------
     @staticmethod
     def get_patient_ddi_alerts(patient_uuid: str) -> list[dict]:
         """

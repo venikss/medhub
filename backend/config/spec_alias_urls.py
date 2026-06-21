@@ -6,7 +6,6 @@ from apps.patients import views as patient_views
 
 from . import spec_alias_views as alias_views
 
-
 urlpatterns = [
     path("admissions/", patient_views.AdmissionListCreateView.as_view()),
     path("admissions/<uuid:pk>/", patient_views.AdmissionDetailView.as_view()),

@@ -34,7 +34,6 @@ export function RecommendationTimeline({
   onSelectRec,
   className,
 }: RecommendationTimelineProps) {
-  // Merge recs + overrides into a sorted timeline
   const events: TimelineEvent[] = [
     ...recommendations.map((rec): TimelineEvent => ({
       id: `rec-${rec.id}`,

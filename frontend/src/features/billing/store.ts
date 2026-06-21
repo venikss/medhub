@@ -2,23 +2,19 @@ import { create } from "zustand";
 import type { BillingInvoiceStatus, ClaimStatus, DenialStatus } from "@/types";
 
 interface BillingStore {
-  // Selected IDs (split-panel pattern)
   selectedPatientId: string | null;
   selectedInvoiceId: string | null;
   selectedClaimId: string | null;
   selectedDenialId: string | null;
   selectedPaymentInvoiceId: string | null;
 
-  // Filters
   invoiceStatusFilter: BillingInvoiceStatus | "all";
   claimStatusFilter: ClaimStatus | "all";
   denialStatusFilter: DenialStatus | "all";
   paymentDateFilter: string;
 
-  // Invoice builder toggle
   showInvoiceBuilder: boolean;
 
-  // Actions
   setSelectedPatient: (id: string | null) => void;
   setSelectedInvoice: (id: string | null) => void;
   setSelectedClaim: (id: string | null) => void;

@@ -1,6 +1,7 @@
 from neomodel import (
     BooleanProperty,
     DateTimeProperty,
+    FloatProperty,
     IntegerProperty,
     RelationshipFrom,
     RelationshipTo,
@@ -9,27 +10,22 @@ from neomodel import (
     StructuredRel,
 )
 
-
 class HasSymptomRel(StructuredRel):
     onset_date = DateTimeProperty()
     severity = StringProperty()
-
 
 class DiagnosedWithRel(StructuredRel):
     date = DateTimeProperty()
     status = StringProperty()
 
-
 class TreatedByRel(StructuredRel):
     efficacy = StringProperty()
     dosage = StringProperty()
-
 
 class HasAllergyRel(StructuredRel):
     reaction = StringProperty()
     severity = StringProperty()
     source_text = StringProperty()
-
 
 class HasLabResultRel(StructuredRel):
     observed_at = DateTimeProperty()
@@ -37,43 +33,36 @@ class HasLabResultRel(StructuredRel):
     panel_name = StringProperty()
     flag = StringProperty()
 
-
 class HasRadiologyReportRel(StructuredRel):
     reported_at = DateTimeProperty()
     status = StringProperty()
     modality = StringProperty()
 
-
 class SymptomNode(StructuredNode):
     name = StringProperty(unique_index=True, required=True)
     snomed_id = StringProperty()
-
 
 class DiseaseNode(StructuredNode):
     name = StringProperty(unique_index=True, required=True)
     icd_10 = StringProperty()
     snomed_id = StringProperty()
+    omim_id = StringProperty()
 
+    symptoms = RelationshipTo("SymptomNode", "HAS_SYMPTOM", model=HasSymptomRel)
 
 class InteractsWithRel(StructuredRel):
     """Drug–Drug Interaction relationship."""
-    severity = StringProperty()       # contraindicated | major | moderate | minor
-    mechanism = StringProperty()      # e.g. pharmacokinetic_cyp3a4_inhibition
-    description = StringProperty()    # clinical effect narrative
-    management = StringProperty()     # clinical management recommendation
-    evidence_level = StringProperty() # A | B | C | D
-    reference_source = StringProperty()  # FDA | WHO | literature
-
+    severity = StringProperty()
+    mechanism = StringProperty()
+    description = StringProperty()
+    management = StringProperty()
+    evidence_level = StringProperty()
+    reference_source = StringProperty()
 
 class CrossReactsWithRel(StructuredRel):
-    rate = StringProperty()           # e.g. "1–10%"
+    rate = StringProperty()
     description = StringProperty()
-    severity = StringProperty()       # always_avoid | use_with_caution
-
-
-# ---------------------------------------------------------------------------
-# Drug taxonomy nodes
-# ---------------------------------------------------------------------------
+    severity = StringProperty()
 
 class DrugClassNode(StructuredNode):
     """Pharmacological drug class (e.g. 'Beta-blockers', 'SSRIs')."""
@@ -85,24 +74,23 @@ class DrugClassNode(StructuredNode):
         "DrugClassNode", "CLASS_CROSS_REACTS_WITH", model=CrossReactsWithRel
     )
 
-
 class DrugInteractionGroupNode(StructuredNode):
     """Pharmacological risk group (e.g. 'QT-Prolonging Drugs').
     Any patient taking two members of the same group has a group-level DDI risk."""
     name = StringProperty(unique_index=True, required=True)
     description = StringProperty()
-    severity = StringProperty()         # contraindicated | major | moderate
+    severity = StringProperty()
     mechanism = StringProperty()
     management = StringProperty()
-    interaction_type = StringProperty() # within_group | class_based
-
+    interaction_type = StringProperty()
 
 class AllergyCrossReactivityGroupNode(StructuredNode):
     """Groups substances with known cross-reactivity (e.g. 'Beta-lactam Antibiotics')."""
     name = StringProperty(unique_index=True, required=True)
     description = StringProperty()
-    reaction_types = StringProperty()   # comma-separated list
-    includes_classes = StringProperty() # comma-separated drug class names
+    reaction_types = StringProperty()
+    includes_classes = StringProperty()
+    trigger_substances = StringProperty()
 
     cross_reacts_with = RelationshipTo(
         "AllergyCrossReactivityGroupNode",
@@ -110,28 +98,20 @@ class AllergyCrossReactivityGroupNode(StructuredNode):
         model=CrossReactsWithRel,
     )
 
-
-# ---------------------------------------------------------------------------
-# Updated MedicationNode — backward-compatible additions
-# ---------------------------------------------------------------------------
-
 class MedicationNode(StructuredNode):
     name = StringProperty(unique_index=True, required=True)
     active_ingredient = StringProperty()
     rxnorm_code = StringProperty()
-    # New standardized fields
     drug_class = StringProperty()
     atc_code = StringProperty()
-    brand_names = StringProperty()   # comma-separated brand names
+    brand_names = StringProperty()
     is_otc = BooleanProperty(default=False)
-    route = StringProperty()         # oral | IV | topical | inhaled | etc.
+    route = StringProperty()
 
-    # Knowledge graph relationships
     interactions = RelationshipTo("MedicationNode", "INTERACTS_WITH", model=InteractsWithRel)
     drug_classes = RelationshipTo("DrugClassNode", "BELONGS_TO_CLASS")
     risk_groups = RelationshipTo("DrugInteractionGroupNode", "MEMBER_OF_RISK_GROUP")
     allergen_groups = RelationshipTo("AllergyCrossReactivityGroupNode", "MEMBER_OF_ALLERGEN_GROUP")
-
 
 class AllergyNode(StructuredNode):
     name = StringProperty(unique_index=True, required=True)
@@ -139,7 +119,6 @@ class AllergyNode(StructuredNode):
     allergen_group = RelationshipTo(
         "AllergyCrossReactivityGroupNode", "BELONGS_TO_ALLERGEN_GROUP"
     )
-
 
 class LabResultNode(StructuredNode):
     result_uid = StringProperty(unique_index=True, required=True)
@@ -155,6 +134,26 @@ class LabResultNode(StructuredNode):
     panel_name = StringProperty()
     is_critical = StringProperty()
 
+class HasImagingOrderRel(StructuredRel):
+    ordered_at = DateTimeProperty()
+    status = StringProperty()
+    modality = StringProperty()
+    priority = StringProperty()
+
+class ImagingOrderNode(StructuredNode):
+    """Imaging order (ImagingOrder) mirrored to Neo4j for duplicate-order detection
+    and appropriateness context. Updated on every status change."""
+    order_uid = StringProperty(unique_index=True, required=True)
+    modality = StringProperty()
+    exam_code = StringProperty()
+    exam_name = StringProperty()
+    body_part = StringProperty()
+    indication = StringProperty()
+    clinical_history = StringProperty()
+    contrast_required = StringProperty()
+    priority = StringProperty()
+    status = StringProperty()
+    accession_number = StringProperty()
 
 class RadiologyReportNode(StructuredNode):
     report_uid = StringProperty(unique_index=True, required=True)
@@ -166,45 +165,58 @@ class RadiologyReportNode(StructuredNode):
     recommendations = StringProperty()
     status = StringProperty()
 
-
 class SNOMEDConceptNode(StructuredNode):
     code = StringProperty(unique_index=True, required=True)
     display = StringProperty(required=True)
-
 
 class ICD10ConceptNode(StructuredNode):
     code = StringProperty(unique_index=True, required=True)
     display = StringProperty(required=True)
 
-
 class RxNormConceptNode(StructuredNode):
     code = StringProperty(unique_index=True, required=True)
     display = StringProperty(required=True)
 
-
 class LOINCConceptNode(StructuredNode):
     code = StringProperty(unique_index=True, required=True)
     display = StringProperty(required=True)
-
 
 class HasEncounterRel(StructuredRel):
     created_at = DateTimeProperty()
     status = StringProperty()
     visit_type = StringProperty()
 
-
 class EncounterNode(StructuredNode):
     """SOAP encounter note synced from PostgreSQL encounters table."""
     encounter_uid = StringProperty(unique_index=True, required=True)
-    visit_type = StringProperty()        # inpatient | outpatient
-    status = StringProperty()            # in-progress | completed | signed
-    subjective = StringProperty()        # Chief complaint / HPI
-    objective = StringProperty()         # Vitals / exam findings
-    assessment = StringProperty()        # Diagnoses / clinical impression
-    plan = StringProperty()              # Treatment plan
+    visit_type = StringProperty()
+    status = StringProperty()
+    subjective = StringProperty()
+    objective = StringProperty()
+    assessment = StringProperty()
+    plan = StringProperty()
     doctor_name = StringProperty()
     created_at = DateTimeProperty()
 
+class HasVitalsRel(StructuredRel):
+    recorded_at = DateTimeProperty()
+    is_admission_vitals = BooleanProperty(default=False)
+
+class VitalsNode(StructuredNode):
+    """Snapshot of a patient's vital signs recorded in PostgreSQL, mirrored to Neo4j for KG queries."""
+    vitals_uid = StringProperty(unique_index=True, required=True)
+    systolic = IntegerProperty()
+    diastolic = IntegerProperty()
+    heart_rate = IntegerProperty()
+    spo2 = IntegerProperty()
+    temperature = FloatProperty()
+    respiratory_rate = IntegerProperty()
+    pain_score = IntegerProperty()
+    gcs = IntegerProperty()
+    news2_score = IntegerProperty()
+    recorded_at = DateTimeProperty()
+    is_admission_vitals = BooleanProperty(default=False)
+    notes = StringProperty()
 
 class PatientNode(StructuredNode):
     uid = StringProperty(unique_index=True, required=True)
@@ -221,8 +233,13 @@ class PatientNode(StructuredNode):
         "HAS_RAD_REPORT",
         model=HasRadiologyReportRel,
     )
+    imaging_orders = RelationshipTo(
+        "ImagingOrderNode",
+        "HAS_IMAGING_ORDER",
+        model=HasImagingOrderRel,
+    )
     encounters = RelationshipTo("EncounterNode", "HAS_ENCOUNTER", model=HasEncounterRel)
-
+    vitals = RelationshipTo("VitalsNode", "HAS_VITALS", model=HasVitalsRel)
 
 DiseaseNode.treatments = RelationshipTo("MedicationNode", "TREATED_BY", model=TreatedByRel)
 DiseaseNode.snomed_concepts = RelationshipTo("SNOMEDConceptNode", "MAPS_TO_SNOMED")

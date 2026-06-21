@@ -42,7 +42,6 @@ from .serializers import (
 )
 from .services import PatientService, AdmissionService
 
-
 def _current_shift() -> str:
     """Return the current nursing shift based on the local hour."""
     hour = timezone.localtime().hour
@@ -51,8 +50,6 @@ def _current_shift() -> str:
     if 15 <= hour < 23:
         return "evening"
     return "night"
-
-
 
 PatientReadWritePermission = ReadWriteRolePermission.for_roles(
     [UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.LAB_TECH, UserRole.RADIOLOGIST, UserRole.PHARMACIST, UserRole.BILLING_STAFF, UserRole.FRONT_DESK],
@@ -79,11 +76,6 @@ ConsentReadWritePermission = ReadWriteRolePermission.for_roles(
     [UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.FRONT_DESK],
 )
 
-
-# ---------------------------------------------------------------------------
-# Patients
-# ---------------------------------------------------------------------------
-
 class PatientListCreateView(APIView):
     permission_classes = [IsAuthenticated, PatientReadWritePermission]
     serializer_class = PatientSerializer
@@ -93,7 +85,6 @@ class PatientListCreateView(APIView):
         if s := request.query_params.get("status"):
             qs = qs.filter(status=s)
         if ward := request.query_params.get("ward"):
-            # Patients currently admitted to a ward
             qs = qs.filter(
                 admissions__ward_id=ward,
                 admissions__status=AdmissionStatus.ACTIVE,
@@ -115,7 +106,6 @@ class PatientListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class PatientDetailView(APIView):
     permission_classes = [IsAuthenticated, PatientReadWritePermission]
     serializer_class = PatientSerializer
@@ -133,9 +123,21 @@ class PatientDetailView(APIView):
 
     def put(self, request, pk):
         patient = self._get_patient(pk)
+        assigned_doctor_id = request.data.get("assignedDoctorId")
+        if assigned_doctor_id is not None:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            if assigned_doctor_id == "":
+                patient.assigned_doctor = None
+            else:
+                try:
+                    patient.assigned_doctor = User.objects.get(id=assigned_doctor_id, role=UserRole.DOCTOR)
+                except User.DoesNotExist:
+                    return Response({"error": "Doctor not found."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = PatientSerializer(patient, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        patient.refresh_from_db()
         write_audit_log(request, AuditAction.UPDATE, "Patient", str(patient.id))
         return Response(PatientSerializer(patient, context={"request": request}).data)
 
@@ -144,7 +146,6 @@ class PatientDetailView(APIView):
         patient.soft_delete()
         write_audit_log(request, AuditAction.DELETE, "Patient", str(patient.id))
         return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 class PatientSearchView(APIView):
     permission_classes = [IsAuthenticated, PatientReadWritePermission]
@@ -166,7 +167,6 @@ class PatientSearchView(APIView):
             PatientSerializer(page, many=True, context={"request": request}).data
         )
 
-
 class PatientDuplicatesView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin | IsFrontDesk]
 
@@ -178,7 +178,6 @@ class PatientDuplicatesView(APIView):
         duplicates = PatientService.find_duplicates(patient)
         return Response({"data": duplicates, "total": len(duplicates)})
 
-
 class PatientMergeView(APIView):
     """
     POST /patients/merge/
@@ -187,7 +186,6 @@ class PatientMergeView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin | IsFrontDesk]
 
     def post(self, request):
-        # FIXED: spec uses keepId / mergeId, not keepPatientId / mergePatientId
         keep_id = request.data.get("keepId")
         merge_id = request.data.get("mergeId")
         if not keep_id or not merge_id:
@@ -198,7 +196,6 @@ class PatientMergeView(APIView):
             {"action": "merge", "mergedId": str(merge_id)}, AuditSeverity.HIGH,
         )
         return Response(PatientSerializer(patient, context={"request": request}).data)
-
 
 class PatientAvatarView(APIView):
     permission_classes = [IsAuthenticated, AdmissionReadWritePermission]
@@ -221,7 +218,6 @@ class PatientAvatarView(APIView):
         patient.avatar = result["fileUrl"]
         patient.save(update_fields=["avatar"])
         return Response(upload_response(result))
-
 
 class PatientInsuranceCardView(APIView):
     permission_classes = [IsAuthenticated, IsStaff]
@@ -247,11 +243,6 @@ class PatientInsuranceCardView(APIView):
         patient.insurance_details = details
         patient.save(update_fields=["insurance_details"])
         return Response(upload_response(result))
-
-
-# ---------------------------------------------------------------------------
-# Admissions / ADT
-# ---------------------------------------------------------------------------
 
 class AdmissionListCreateView(APIView):
     permission_classes = [IsAuthenticated, AdmissionReadWritePermission]
@@ -288,7 +279,6 @@ class AdmissionListCreateView(APIView):
         serializer = AdmissionSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
-            # FIXED: use AdmissionStatus.ACTIVE (not non-existent ADMITTED)
             admission = serializer.save(status=AdmissionStatus.ACTIVE)
 
             patient_update_fields = ["status", "admission_date"]
@@ -315,7 +305,6 @@ class AdmissionListCreateView(APIView):
 
             admission.patient.save(update_fields=patient_update_fields)
 
-            # ── Auto-create STAT admission vitals task for nursing ──────────────
             try:
                 from apps.nurses.models import Task, TaskStatus
                 room = admission.patient.room_number or "TBD"
@@ -334,10 +323,8 @@ class AdmissionListCreateView(APIView):
                     shift=_current_shift(),
                 )
             except Exception:
-                pass  # Never block admission creation over a task failure
-            # ───────────────────────────────────────────────────────────────────
+                pass
 
-        # Targeted notification to Admitting and Assigned doctors
         admitting_doctor_id = admission.admitting_doctor_id
         assigned_doctor_id = admission.patient.assigned_doctor_id
 
@@ -361,8 +348,6 @@ class AdmissionListCreateView(APIView):
             AdmissionSerializer(admission, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
-
 
 class AdmissionDetailView(APIView):
     permission_classes = [IsAuthenticated, IsStaff]
@@ -391,7 +376,6 @@ class AdmissionDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(AdmissionSerializer(admission, context={"request": request}).data)
-
 
 class AdmissionStatusView(APIView):
     """
@@ -447,7 +431,6 @@ class AdmissionStatusView(APIView):
         )
         return Response(AdmissionSerializer(admission, context={"request": request}).data)
 
-
 class AdmissionDischargeView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor | IsAdmin | IsFrontDesk]
 
@@ -459,7 +442,6 @@ class AdmissionDischargeView(APIView):
         if admission.status != AdmissionStatus.ACTIVE:
             raise ConflictError("Only active admissions can be discharged.")
         admission = AdmissionService.discharge(admission, request.data, request.user)
-        # Targeted notification to Admitting and Assigned doctors
         admitting_doctor_id = admission.admitting_doctor_id
         assigned_doctor_id = admission.patient.assigned_doctor_id
         
@@ -487,7 +469,6 @@ class AdmissionDischargeView(APIView):
         )
         return Response(AdmissionSerializer(admission, context={"request": request}).data)
 
-
 class AdmissionTransferView(APIView):
     permission_classes = [IsAuthenticated, IsDoctor | IsAdmin | IsNurse | IsFrontDesk]
 
@@ -507,11 +488,6 @@ class AdmissionTransferView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
-# ---------------------------------------------------------------------------
-# Beds & Wards
-# ---------------------------------------------------------------------------
-
 class WardListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -525,7 +501,6 @@ class WardListView(APIView):
             WardSerializer(page, many=True, context={"request": request}).data
         )
 
-
 class BedListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -537,7 +512,6 @@ class BedListView(APIView):
             qs = qs.filter(ward_id=ward)
         if s := request.query_params.get("status"):
             qs = qs.filter(status=s)
-        # FIXED: type filter added
         if t := request.query_params.get("type"):
             qs = qs.filter(type=t)
         paginator = StandardPagination()
@@ -545,7 +519,6 @@ class BedListView(APIView):
         return paginator.get_paginated_response(
             BedSerializer(page, many=True, context={"request": request}).data
         )
-
 
 class BedDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -559,7 +532,6 @@ class BedDetailView(APIView):
         except Bed.DoesNotExist:
             raise NotFoundError("Bed not found.")
         return Response(BedSerializer(bed, context={"request": request}).data)
-
 
 class BedStatusView(APIView):
     permission_classes = [IsAuthenticated, IsNurse | IsAdmin]
@@ -580,11 +552,6 @@ class BedStatusView(APIView):
         if new_status == "available":
             emit_adt_bed_available({"bedId": str(bed.id), "wardId": str(bed.ward_id)})
         return Response(BedSerializer(bed, context={"request": request}).data)
-
-
-# ---------------------------------------------------------------------------
-# Front Desk Summary
-# ---------------------------------------------------------------------------
 
 class FrontDeskSummaryView(APIView):
     permission_classes = [IsAuthenticated, IsFrontDesk | IsAdmin | IsNurse]
@@ -668,7 +635,6 @@ class FrontDeskSummaryView(APIView):
             }
         )
 
-
 class FrontDeskAdmissionLookupsView(APIView):
     permission_classes = [IsAuthenticated, IsFrontDesk | IsAdmin | IsNurse]
 
@@ -734,7 +700,6 @@ class FrontDeskAdmissionLookupsView(APIView):
             }
         )
 
-
 class FrontDeskPatientSummaryView(APIView):
     permission_classes = [IsAuthenticated, IsFrontDesk | IsAdmin | IsNurse]
 
@@ -782,7 +747,6 @@ class FrontDeskPatientSummaryView(APIView):
                 "pendingConsents": consents.exclude(status="signed").count(),
             }
         )
-
 
 class FrontDeskCheckInView(APIView):
     permission_classes = [IsAuthenticated, IsFrontDesk | IsAdmin]
@@ -882,11 +846,6 @@ class FrontDeskCheckInView(APIView):
             }
         )
 
-
-# ---------------------------------------------------------------------------
-# Queue
-# ---------------------------------------------------------------------------
-
 class QueueListCreateView(APIView):
     permission_classes = [IsAuthenticated, QueueReadWritePermission]
     serializer_class = QueueSerializer
@@ -922,7 +881,6 @@ class QueueListCreateView(APIView):
             QueueSerializer(ticket_obj, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
 
 class QueueStatusView(APIView):
     """
@@ -969,7 +927,6 @@ class QueueStatusView(APIView):
         ticket.save()
         return Response(QueueSerializer(ticket, context={"request": request}).data)
 
-
 class QueueCallView(APIView):
     """Legacy convenience endpoint â€” calls PUT /queue/:id/status with status=called."""
     permission_classes = [IsAuthenticated, IsStaff]
@@ -991,7 +948,6 @@ class QueueCallView(APIView):
         })
         return Response(QueueSerializer(ticket, context={"request": request}).data)
 
-
 class QueueStatsView(APIView):
     permission_classes = [IsAuthenticated, IsStaff]
 
@@ -1008,11 +964,6 @@ class QueueStatsView(APIView):
                 status=QueueStatus.NO_SHOW, queue_date=today
             ).count(),
         })
-
-
-# ---------------------------------------------------------------------------
-# Appointments
-# ---------------------------------------------------------------------------
 
 class AppointmentListCreateView(APIView):
     permission_classes = [IsAuthenticated, AppointmentReadWritePermission]
@@ -1044,7 +995,6 @@ class AppointmentListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class AppointmentDetailView(APIView):
     permission_classes = [IsAuthenticated, AppointmentReadWritePermission]
     serializer_class = AppointmentSerializer
@@ -1074,7 +1024,6 @@ class AppointmentDetailView(APIView):
         appt.soft_delete()
         write_audit_log(request, AuditAction.DELETE, "Appointment", str(appt.id))
         return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 class AppointmentStatusView(APIView):
     """
@@ -1113,11 +1062,6 @@ class AppointmentStatusView(APIView):
         )
         return Response(AppointmentSerializer(appt, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Consents
-# ---------------------------------------------------------------------------
-
 class ConsentListCreateView(APIView):
     permission_classes = [IsAuthenticated, ConsentReadWritePermission]
     serializer_class = ConsentSerializer
@@ -1143,7 +1087,6 @@ class ConsentListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class ConsentSignView(APIView):
     permission_classes = [IsAuthenticated, IsStaff]
     serializer_class = ConsentSerializer
@@ -1168,7 +1111,6 @@ class ConsentSignView(APIView):
         )
         return Response(ConsentSerializer(consent, context={"request": request}).data)
 
-
 class ConsentFileUploadView(APIView):
     permission_classes = [IsAuthenticated, IsStaff]
     parser_classes = [MultiPartParser]
@@ -1190,19 +1132,4 @@ class ConsentFileUploadView(APIView):
         consent.file_url = result["fileUrl"]
         consent.save(update_fields=["file_url"])
         return Response(upload_response(result), status=status.HTTP_201_CREATED)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

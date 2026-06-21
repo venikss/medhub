@@ -5,7 +5,6 @@ export const EMERGENCY_TYPES: CDSSRecommendationType[] = [
   "drug_interaction", "allergy", "critical_result", "panic_value",
 ];
 
-// Emergency module is accessed by doctors and nurses working in the ED
 const EMERGENCY_ROLES = ["doctor", "nurse"] as UserRole[];
 
 /**
@@ -18,7 +17,6 @@ export function filterForEmergency(recs: CDSSRecommendation[]): CDSSRecommendati
       return r.targetRoles.some((role) => EMERGENCY_ROLES.includes(role));
     }
     if (r.sourceModule === "emergency") return true;
-    // Show all critical severity when no targeting info is present
     if (!r.sourceModule && r.severity === "critical") return true;
     if (!r.sourceModule) return EMERGENCY_TYPES.includes(r.type);
     return false;

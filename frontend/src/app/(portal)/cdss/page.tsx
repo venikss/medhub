@@ -67,7 +67,7 @@ export default function CDSSDashboard() {
   function resetToAllPatients() {
     setSeverityFilter("all");
     setTypeFilter("all");
-    setStatusFilter("all");
+    setStatusFilter("active");
     setPatientSearch("");
     selectRecommendation(null);
   }

@@ -7,24 +7,20 @@ from pathlib import Path
 from datetime import timedelta
 from decouple import config, Csv
 
-# ─── Paths ────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# ─── Security ─────────────────────────────────────────────────────────────────
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="127.0.0.1,localhost", cast=Csv())
 
-# ─── Applications ─────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
-    "daphne",  # must be first for Django Channels ASGI
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # Third-party
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
@@ -32,7 +28,6 @@ INSTALLED_APPS = [
     "channels",
     "django_filters",
     "storages",
-    # Local bounded contexts
     "apps.authentication",
     "apps.patients",
     "apps.doctors",
@@ -47,7 +42,6 @@ INSTALLED_APPS = [
     "apps.fhir",
 ]
 
-# ─── Middleware ────────────────────────────────────────────────────────────────
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -64,10 +58,8 @@ ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-# ─── Custom User model ────────────────────────────────────────────────────────
 AUTH_USER_MODEL = "authentication.User"
 
-# ─── Templates ────────────────────────────────────────────────────────────────
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -84,7 +76,6 @@ TEMPLATES = [
     },
 ]
 
-# ─── Database ─────────────────────────────────────────────────────────────────
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -97,7 +88,6 @@ DATABASES = {
     }
 }
 
-# ─── Redis ────────────────────────────────────────────────────────────────────
 REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
 
 CACHES = {
@@ -116,7 +106,6 @@ CACHES = {
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
 
-# ─── Django Channels ──────────────────────────────────────────────────────────
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -128,7 +117,6 @@ CHANNEL_LAYERS = {
     },
 }
 
-# ─── JWT ──────────────────────────────────────────────────────────────────────
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -145,7 +133,6 @@ SIMPLE_JWT = {
     "TOKEN_OBTAIN_SERIALIZER": "apps.authentication.serializers.CustomTokenObtainPairSerializer",
 }
 
-# ─── Django REST Framework ────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -169,8 +156,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-# ─── Spectacular (OpenAPI 3.1) ─────────────────────────────────────────────────
-# ─── CORS ─────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",
     default="http://localhost:3000,http://127.0.0.1:3000",
@@ -189,10 +174,8 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
 ]
 
-# ─── Rate Limiting ────────────────────────────────────────────────────────────
 RATELIMIT_USE_CACHE = "default"
 
-# ─── File Storage (S3 / MinIO) ────────────────────────────────────────────────
 USE_S3 = config("USE_S3", default=False, cast=bool)
 if USE_S3:
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
@@ -212,7 +195,6 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 WHITENOISE_USE_FINDERS = True
 
-# ─── Password Validation ──────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {
@@ -223,7 +205,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# ─── Email ────────────────────────────────────────────────────────────────────
 EMAIL_BACKEND = config(
     "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
 )
@@ -234,7 +215,6 @@ EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@medhub.com")
 
-# ─── Internationalization ─────────────────────────────────────────────────────
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
@@ -242,11 +222,9 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ─── File Upload Limits ───────────────────────────────────────────────────────
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
-# ─── Logging ──────────────────────────────────────────────────────────────────
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -270,16 +248,11 @@ LOGGING = {
     },
 }
 
-# ─── Neo4j (Knowledge Graph) ──────────────────────────────────────────────────
 import neomodel
 neomodel.config.DATABASE_URL = config("NEOMODEL_NEO4J_BOLT_URL", default="bolt://neo4j:medhub_secret@neo4j:7687")
 neomodel.config.AUTO_INSTALL_LABELS = True
 
-# ─── LLM Configuration ────────────────────────────────────────────────────────
-# Local MedGemma via mlx_lm.server (OpenAI-compatible endpoint)
-# Start server: mlx_lm server --model .models/medgemma-1_5-4b-it-4bit --port 8081
 LLM_API_URL = config("LLM_API_URL", default="http://localhost:8081/v1/chat/completions")
-# mlx_lm.server uses the full local path as the model ID
 LLM_MODEL_NAME = config(
     "LLM_MODEL_NAME",
     default="/Users/khaledsamy/Graduation Project/projKG test/.models/medgemma-1_5-4b-it-4bit",

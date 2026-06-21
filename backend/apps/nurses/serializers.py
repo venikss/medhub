@@ -9,18 +9,66 @@ from .models import (
     NursingNote, Task, Wound, Handoff, DischargeChecklistItem,
 )
 
-
 def mar_status_for_api(instance):
     if instance.status == "scheduled" and instance.scheduled_time and instance.scheduled_time < timezone.now():
         return "overdue"
     return instance.status
-
 
 class VitalsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vitals
         fields = "__all__"
         read_only_fields = ["id", "created_at", "updated_at", "recorded_by", "news2_score", "recorded_at"]
+
+    def validate_systolic(self, value):
+        if value is not None and not (20 <= value <= 400):
+            raise serializers.ValidationError("Systolic BP must be between 20 and 400 mmHg.")
+        return value
+
+    def validate_diastolic(self, value):
+        if value is not None and not (5 <= value <= 300):
+            raise serializers.ValidationError("Diastolic BP must be between 5 and 300 mmHg.")
+        return value
+
+    def validate_heart_rate(self, value):
+        if value is not None and not (5 <= value <= 400):
+            raise serializers.ValidationError("Heart rate must be between 5 and 400 bpm.")
+        return value
+
+    def validate_temperature(self, value):
+        if value is not None and not (20.0 <= float(value) <= 50.0):
+            raise serializers.ValidationError("Temperature must be between 20°C and 50°C.")
+        return value
+
+    def validate_spo2(self, value):
+        if value is not None and not (1 <= value <= 100):
+            raise serializers.ValidationError("SpO₂ must be between 1% and 100%.")
+        return value
+
+    def validate_respiratory_rate(self, value):
+        if value is not None and not (0 <= value <= 100):
+            raise serializers.ValidationError("Respiratory rate must be between 0 and 100 breaths/min.")
+        return value
+
+    def validate_pain_score(self, value):
+        if value is not None and not (0 <= value <= 10):
+            raise serializers.ValidationError("Pain score must be between 0 and 10.")
+        return value
+
+    def validate_gcs(self, value):
+        if value is not None and not (3 <= value <= 15):
+            raise serializers.ValidationError("GCS must be between 3 and 15.")
+        return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        systolic = attrs.get("systolic")
+        diastolic = attrs.get("diastolic")
+        if systolic is not None and diastolic is not None and diastolic >= systolic:
+            raise serializers.ValidationError(
+                {"diastolic": "Diastolic BP must be lower than systolic BP."}
+            )
+        return attrs
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -44,7 +92,6 @@ class VitalsSerializer(serializers.ModelSerializer):
             "createdAt": data["created_at"],
         }
 
-
 class IntakeOutputSerializer(serializers.ModelSerializer):
     class Meta:
         model = IntakeOutput
@@ -66,7 +113,6 @@ class IntakeOutputSerializer(serializers.ModelSerializer):
             "createdAt": data["created_at"],
         }
 
-
 class PainAssessmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = PainAssessment
@@ -87,7 +133,6 @@ class PainAssessmentSerializer(serializers.ModelSerializer):
             "intervention": data["intervention"],
             "createdAt": data["created_at"],
         }
-
 
 class MAREntrySerializer(serializers.ModelSerializer):
     class Meta:
@@ -134,14 +179,13 @@ class MAREntrySerializer(serializers.ModelSerializer):
             "createdAt": data["created_at"],
         }
 
-
 class NursingNoteSerializer(serializers.ModelSerializer):
     is_editable = serializers.SerializerMethodField()
 
     class Meta:
         model = NursingNote
         fields = "__all__"
-        read_only_fields = ["id", "created_at", "updated_at", "nurse"]
+        read_only_fields = ["id", "created_at", "updated_at", "nurse", "edit_deadline"]
 
     def get_is_editable(self, obj):
         return timezone.now() < obj.edit_deadline
@@ -161,7 +205,6 @@ class NursingNoteSerializer(serializers.ModelSerializer):
             "createdAt": data["created_at"],
             "updatedAt": data["updated_at"],
         }
-
 
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
@@ -198,7 +241,6 @@ class TaskSerializer(serializers.ModelSerializer):
             "createdAt": data["created_at"],
         }
 
-
 class WoundSerializer(serializers.ModelSerializer):
     class Meta:
         model = Wound
@@ -222,7 +264,6 @@ class WoundSerializer(serializers.ModelSerializer):
             "createdAt": data["created_at"],
             "updatedAt": data["updated_at"],
         }
-
 
 class HandoffSerializer(serializers.ModelSerializer):
     class Meta:
@@ -262,7 +303,6 @@ class HandoffSerializer(serializers.ModelSerializer):
             "recommendation": data["recommendation"],
             "createdAt": data["created_at"],
         }
-
 
 class DischargeChecklistSerializer(serializers.ModelSerializer):
     class Meta:

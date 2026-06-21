@@ -12,7 +12,6 @@ from django.http import Http404
 
 logger = logging.getLogger(__name__)
 
-
 class AppError(Exception):
     """Base application error."""
 
@@ -28,36 +27,30 @@ class AppError(Exception):
             self.status_code = status_code
         super().__init__(self.message)
 
-
 class NotFoundError(AppError):
     status_code = 404
     default_code = "NOT_FOUND"
     default_message = "Resource not found."
-
 
 class ConflictError(AppError):
     status_code = 409
     default_code = "CONFLICT"
     default_message = "Resource conflict."
 
-
 class ValidationAppError(AppError):
     status_code = 422
     default_code = "VALIDATION_ERROR"
     default_message = "Validation failed."
-
 
 class ForbiddenError(AppError):
     status_code = 403
     default_code = "FORBIDDEN"
     default_message = "You do not have permission to perform this action."
 
-
 class UnauthorizedError(AppError):
     status_code = 401
     default_code = "UNAUTHORIZED"
     default_message = "Authentication credentials were not provided."
-
 
 def _error_response(code: str, message: str, details=None, status_code: int = 400):
     body = {"error": {"code": code, "message": message}}
@@ -65,13 +58,10 @@ def _error_response(code: str, message: str, details=None, status_code: int = 40
         body["error"]["details"] = details
     return Response(body, status=status_code)
 
-
 def custom_exception_handler(exc, context):
-    # Handle our custom AppError subclasses
     if isinstance(exc, AppError):
         return _error_response(exc.code, exc.message, exc.details, exc.status_code)
 
-    # Handle Django built-ins
     if isinstance(exc, Http404):
         return _error_response("NOT_FOUND", str(exc) or "Not found.", status_code=404)
 
@@ -86,12 +76,10 @@ def custom_exception_handler(exc, context):
             "VALIDATION_ERROR", "Validation failed.", exc.message_dict if hasattr(exc, "message_dict") else str(exc), 422
         )
 
-    # Let DRF handle the rest (serializer errors, auth errors, etc.)
     response = exception_handler(exc, context)
 
     if response is not None:
         errors = response.data
-        # Map DRF status codes to our error format
         code_map = {
             400: "BAD_REQUEST",
             401: "UNAUTHORIZED",
@@ -126,7 +114,6 @@ def custom_exception_handler(exc, context):
         response.data = new_data
         return response
 
-    # Unexpected server error
     logger.exception("Unhandled exception: %s", exc)
     return _error_response(
         "INTERNAL_SERVER_ERROR",

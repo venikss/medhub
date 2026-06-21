@@ -8,13 +8,11 @@ import string
 from datetime import date
 from django.utils import timezone
 
-
 def generate_mrn() -> str:
     """Auto-generate unique Medical Record Number: MRN-YYYYMMDD-XXXXXX"""
     today = timezone.now().strftime("%Y%m%d")
     suffix = "".join(random.choices(string.digits, k=6))
     return f"MRN-{today}-{suffix}"
-
 
 def generate_accession_number(prefix: str = "ACC") -> str:
     """Generate accession number: PREFIX-YYYYMMDD-####"""
@@ -22,19 +20,16 @@ def generate_accession_number(prefix: str = "ACC") -> str:
     suffix = "".join(random.choices(string.digits, k=4))
     return f"{prefix}-{today}-{suffix}"
 
-
 def generate_barcode(prefix: str = "BC") -> str:
     """Generate a generic barcode-like identifier."""
     today = timezone.now().strftime("%Y%m%d")
     suffix = "".join(random.choices(string.digits, k=6))
     return f"{prefix}-{today}-{suffix}"
 
-
 def generate_queue_ticket(prefix: str = "Q") -> str:
     """Generate queue ticket number."""
     suffix = "".join(random.choices(string.digits, k=4))
     return f"{prefix}{suffix}"
-
 
 def generate_employee_id(role: str) -> str:
     """Generate a human-readable employee identifier based on the staff role."""
@@ -52,12 +47,10 @@ def generate_employee_id(role: str) -> str:
     suffix = "".join(random.choices(string.digits, k=6))
     return f"{prefix}-{suffix}"
 
-
 def compute_age(dob: date) -> int:
     """Calculate age in years from date of birth."""
     today = date.today()
     return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-
 
 def calculate_news2_score(vitals: dict) -> int:
     """
@@ -136,7 +129,6 @@ def calculate_news2_score(vitals: dict) -> int:
         score += 3
 
     return score
-
 
 def generate_temp_password(length: int = 12) -> str:
     """Generate a secure temporary password using cryptographic RNG."""

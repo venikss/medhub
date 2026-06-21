@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useCDSSModule } from "@/features/cdss/hooks/useCDSSModule";
+import { useAIAssistantStore } from "@/features/ai-assistant/store";
 import { AlertBanner }         from "@/features/cdss/components/shared/AlertBanner";
 import { RecommendationCard }  from "@/features/cdss/components/shared/RecommendationCard";
 import { ExplanationPanel }    from "@/features/cdss/components/shared/ExplanationPanel";
@@ -45,6 +46,18 @@ export function DoctorCDSSPanel({
   const cdss = useCDSSModule({ module: "doctor", patientId });
   const [expandedId, setExpandedId]       = useState<string | null>(null);
   const [evidenceRec, setEvidenceRec]     = useState<typeof cdss.recommendations[0] | null>(null);
+  const openWithContext = useAIAssistantStore((s) => s.openWithContext);
+  const patientNameFromStore = useAIAssistantStore((s) => s.patientName);
+
+  function handleAskAI(rec: typeof cdss.recommendations[0]) {
+    const name = patientNameFromStore ?? "this patient";
+    const message =
+      `Explain why you recommended: "${rec.title}"\n\n` +
+      `Summary: ${rec.summary}\n\n` +
+      `Severity: ${rec.severity} · Type: ${rec.type}\n\n` +
+      `What is the clinical reasoning behind this recommendation for ${name}?`;
+    openWithContext(patientId, name, message);
+  }
 
   return (
     <div className={cn("rounded-xl border border-border/50 overflow-hidden", className)}>
@@ -113,6 +126,7 @@ export function DoctorCDSSPanel({
                         onSelect={() => setExpandedId(expandedId === rec.id ? null : rec.id)}
                         onExplain={() => setExpandedId(expandedId === rec.id ? null : rec.id)}
                         onOverride={() => cdss.openOverride(rec.id)}
+                        onAskAI={() => handleAskAI(rec)}
                       />
                       {/* Inline expandable explanation panel */}
                       {expandedId === rec.id && (

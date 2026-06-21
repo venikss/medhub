@@ -7,7 +7,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import type { CDSSRecommendation, CDSSEvidenceSourceType, CDSSConfidenceLevel } from "@/types";
 
-// ── Confidence Meter ──────────────────────────────────────────────────────────
 const CONFIDENCE_CONFIG: Record<CDSSConfidenceLevel, { color: string; ring: string; label: string }> = {
   high:     { color: "text-emerald-600", ring: "bg-emerald-500", label: "High Confidence" },
   moderate: { color: "text-amber-600",   ring: "bg-amber-500",   label: "Moderate Confidence" },
@@ -15,7 +14,7 @@ const CONFIDENCE_CONFIG: Record<CDSSConfidenceLevel, { color: string; ring: stri
 };
 
 function ConfidenceMeter({ score, level }: { score: number; level: CDSSConfidenceLevel }) {
-  const cfg = CONFIDENCE_CONFIG[level];
+  const cfg = CONFIDENCE_CONFIG[level] ?? CONFIDENCE_CONFIG["low"];
   return (
     <div className="flex items-center gap-3">
       <div className="relative h-12 w-12 shrink-0">
@@ -43,7 +42,6 @@ function ConfidenceMeter({ score, level }: { score: number; level: CDSSConfidenc
   );
 }
 
-// ── Evidence Source Type Icons ────────────────────────────────────────────────
 const SOURCE_ICONS: Record<CDSSEvidenceSourceType, React.ElementType> = {
   guideline:    BookOpen,
   drug_database: Database,
@@ -68,7 +66,6 @@ const SOURCE_TYPE_LABELS: Record<CDSSEvidenceSourceType, string> = {
   ehr_pattern:  "EHR Pattern",
 };
 
-// ── Flag Icons ────────────────────────────────────────────────────────────────
 function FlagIcon({ flag }: { flag?: string }) {
   if (!flag || flag === "normal") return <Minus className="h-3 w-3 text-muted-foreground" />;
   if (flag === "high") return <TrendingUp className="h-3 w-3 text-amber-600" />;
@@ -77,13 +74,14 @@ function FlagIcon({ flag }: { flag?: string }) {
   return null;
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
 interface ExplanationPanelProps {
   rec: CDSSRecommendation;
 }
 
 export function ExplanationPanel({ rec }: ExplanationPanelProps) {
-  const { explanation, evidenceSources, suggestedActions } = rec;
+  const explanation      = rec.explanation      ?? {};
+  const evidenceSources  = rec.evidenceSources  ?? [];
+  const suggestedActions = rec.suggestedActions  ?? [];
 
   return (
     <div className="space-y-4">
@@ -101,7 +99,7 @@ export function ExplanationPanel({ rec }: ExplanationPanelProps) {
         <TabsList className="h-8 text-xs">
           <TabsTrigger value="explanation" className="text-xs h-7">Reasoning</TabsTrigger>
           <TabsTrigger value="inputs" className="text-xs h-7">Clinical Inputs</TabsTrigger>
-          <TabsTrigger value="evidence" className="text-xs h-7">Evidence ({evidenceSources.length})</TabsTrigger>
+          <TabsTrigger value="evidence" className="text-xs h-7">Evidence ({(evidenceSources ?? []).length})</TabsTrigger>
           <TabsTrigger value="actions" className="text-xs h-7">Actions</TabsTrigger>
         </TabsList>
 
@@ -110,7 +108,10 @@ export function ExplanationPanel({ rec }: ExplanationPanelProps) {
           {/* Confidence Meter */}
           <Card className="border-border/40">
             <CardContent className="pt-4 pb-4">
-              <ConfidenceMeter score={explanation.confidenceScore} level={explanation.confidence} />
+              <ConfidenceMeter
+                score={explanation.confidenceScore ?? 0}
+                level={(["high", "moderate", "low"] as const).includes(explanation.confidence) ? explanation.confidence : "low"}
+              />
               {explanation.modelVersion && (
                 <p className="text-[10px] text-muted-foreground mt-2 italic">
                   Model: {explanation.modelVersion}
@@ -129,7 +130,7 @@ export function ExplanationPanel({ rec }: ExplanationPanelProps) {
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Reasoning Chain</p>
             <ul className="space-y-1.5">
-              {explanation.reasoning.map((r, i) => (
+              {(explanation.reasoning ?? []).map((r, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
                   <span className="h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
                     {i + 1}
@@ -141,11 +142,11 @@ export function ExplanationPanel({ rec }: ExplanationPanelProps) {
           </div>
 
           {/* Limitations */}
-          {explanation.limitations.length > 0 && (
+          {(explanation.limitations ?? []).length > 0 && (
             <div className="rounded-lg border border-amber-400/30 bg-amber-500/5 p-3">
               <p className="text-xs font-semibold text-amber-700 mb-1.5">Known Limitations</p>
               <ul className="space-y-1">
-                {explanation.limitations.map((l, i) => (
+                {(explanation.limitations ?? []).map((l, i) => (
                   <li key={i} className="text-xs text-amber-700/80 flex items-start gap-1.5">
                     <span className="mt-0.5 shrink-0">•</span>
                     {l}
@@ -168,7 +169,7 @@ export function ExplanationPanel({ rec }: ExplanationPanelProps) {
                 </tr>
               </thead>
               <tbody>
-                {explanation.clinicalInputs.map((inp, i) => (
+                {(explanation.clinicalInputs ?? []).map((inp, i) => (
                   <tr key={i} className={cn(
                     "border-b border-border/20",
                     inp.flag === "critical" && "bg-red-500/5",

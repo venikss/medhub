@@ -19,9 +19,6 @@ Structure:
   ALLERGEN_GROUPS       – cross-reactivity groups for allergy safety
 """
 
-# ---------------------------------------------------------------------------
-# Drug classes
-# ---------------------------------------------------------------------------
 DRUG_CLASSES: list[dict] = [
     {
         "name": "Beta-blockers",
@@ -180,11 +177,7 @@ DRUG_CLASSES: list[dict] = [
     },
 ]
 
-# ---------------------------------------------------------------------------
-# Individual drugs
-# ---------------------------------------------------------------------------
 DRUGS: list[dict] = [
-    # --- Cardiovascular ---
     {"name": "Metoprolol", "active_ingredient": "metoprolol succinate", "rxnorm_code": "866514", "drug_class": "Beta-blockers", "atc_code": "C07AB02", "brand_names": "Lopressor, Toprol-XL", "is_otc": False, "route": "oral"},
     {"name": "Atenolol", "active_ingredient": "atenolol", "rxnorm_code": "1202", "drug_class": "Beta-blockers", "atc_code": "C07AB03", "brand_names": "Tenormin", "is_otc": False, "route": "oral"},
     {"name": "Carvedilol", "active_ingredient": "carvedilol", "rxnorm_code": "20352", "drug_class": "Beta-blockers", "atc_code": "C07AG02", "brand_names": "Coreg", "is_otc": False, "route": "oral"},
@@ -204,11 +197,9 @@ DRUGS: list[dict] = [
     {"name": "Spironolactone", "active_ingredient": "spironolactone", "rxnorm_code": "9997", "drug_class": "Loop Diuretics", "atc_code": "C03DA01", "brand_names": "Aldactone", "is_otc": False, "route": "oral"},
     {"name": "Amiodarone", "active_ingredient": "amiodarone hydrochloride", "rxnorm_code": "703", "drug_class": "Antiarrhythmics", "atc_code": "C01BD01", "brand_names": "Cordarone, Pacerone", "is_otc": False, "route": "oral,IV"},
     {"name": "Digoxin", "active_ingredient": "digoxin", "rxnorm_code": "3407", "drug_class": "Cardiac Glycosides", "atc_code": "C01AA05", "brand_names": "Lanoxin", "is_otc": False, "route": "oral,IV"},
-    # --- Lipid Lowering ---
     {"name": "Atorvastatin", "active_ingredient": "atorvastatin calcium", "rxnorm_code": "83367", "drug_class": "Statins (HMG-CoA Reductase Inhibitors)", "atc_code": "C10AA05", "brand_names": "Lipitor", "is_otc": False, "route": "oral"},
     {"name": "Rosuvastatin", "active_ingredient": "rosuvastatin calcium", "rxnorm_code": "301542", "drug_class": "Statins (HMG-CoA Reductase Inhibitors)", "atc_code": "C10AA07", "brand_names": "Crestor", "is_otc": False, "route": "oral"},
     {"name": "Simvastatin", "active_ingredient": "simvastatin", "rxnorm_code": "36567", "drug_class": "Statins (HMG-CoA Reductase Inhibitors)", "atc_code": "C10AA01", "brand_names": "Zocor", "is_otc": False, "route": "oral"},
-    # --- Anticoagulants / Antiplatelets ---
     {"name": "Warfarin", "active_ingredient": "warfarin sodium", "rxnorm_code": "11289", "drug_class": "Anticoagulants", "atc_code": "B01AA03", "brand_names": "Coumadin, Jantoven", "is_otc": False, "route": "oral"},
     {"name": "Apixaban", "active_ingredient": "apixaban", "rxnorm_code": "1364430", "drug_class": "Anticoagulants", "atc_code": "B01AF02", "brand_names": "Eliquis", "is_otc": False, "route": "oral"},
     {"name": "Rivaroxaban", "active_ingredient": "rivaroxaban", "rxnorm_code": "1114195", "drug_class": "Anticoagulants", "atc_code": "B01AF01", "brand_names": "Xarelto", "is_otc": False, "route": "oral"},
@@ -217,14 +208,12 @@ DRUGS: list[dict] = [
     {"name": "Aspirin", "active_ingredient": "aspirin", "rxnorm_code": "1191", "drug_class": "Antiplatelets", "atc_code": "B01AC06", "brand_names": "Bayer Aspirin, Ecotrin", "is_otc": True, "route": "oral"},
     {"name": "Clopidogrel", "active_ingredient": "clopidogrel bisulfate", "rxnorm_code": "32968", "drug_class": "Antiplatelets", "atc_code": "B01AC04", "brand_names": "Plavix", "is_otc": False, "route": "oral"},
     {"name": "Ticagrelor", "active_ingredient": "ticagrelor", "rxnorm_code": "1116632", "drug_class": "Antiplatelets", "atc_code": "B01AC24", "brand_names": "Brilinta", "is_otc": False, "route": "oral"},
-    # --- Antidiabetics ---
     {"name": "Metformin", "active_ingredient": "metformin hydrochloride", "rxnorm_code": "6809", "drug_class": "Antidiabetics (Biguanides)", "atc_code": "A10BA02", "brand_names": "Glucophage, Fortamet", "is_otc": False, "route": "oral"},
     {"name": "Glipizide", "active_ingredient": "glipizide", "rxnorm_code": "4821", "drug_class": "Sulfonylureas", "atc_code": "A10BB07", "brand_names": "Glucotrol", "is_otc": False, "route": "oral"},
     {"name": "Glyburide", "active_ingredient": "glyburide", "rxnorm_code": "4815", "drug_class": "Sulfonylureas", "atc_code": "A10BB01", "brand_names": "DiaBeta, Micronase", "is_otc": False, "route": "oral"},
     {"name": "Sitagliptin", "active_ingredient": "sitagliptin phosphate", "rxnorm_code": "593411", "drug_class": "DPP-4 Inhibitors", "atc_code": "A10BH01", "brand_names": "Januvia", "is_otc": False, "route": "oral"},
     {"name": "Empagliflozin", "active_ingredient": "empagliflozin", "rxnorm_code": "1545653", "drug_class": "SGLT2 Inhibitors", "atc_code": "A10BK03", "brand_names": "Jardiance", "is_otc": False, "route": "oral"},
     {"name": "Insulin Glargine", "active_ingredient": "insulin glargine", "rxnorm_code": "274783", "drug_class": "Insulins", "atc_code": "A10AE04", "brand_names": "Lantus, Basaglar", "is_otc": False, "route": "subcutaneous"},
-    # --- NSAIDs / Analgesics ---
     {"name": "Ibuprofen", "active_ingredient": "ibuprofen", "rxnorm_code": "5640", "drug_class": "NSAIDs", "atc_code": "M01AE01", "brand_names": "Advil, Motrin", "is_otc": True, "route": "oral"},
     {"name": "Naproxen", "active_ingredient": "naproxen sodium", "rxnorm_code": "41493", "drug_class": "NSAIDs", "atc_code": "M01AE02", "brand_names": "Aleve, Naprosyn", "is_otc": True, "route": "oral"},
     {"name": "Diclofenac", "active_ingredient": "diclofenac sodium", "rxnorm_code": "3355", "drug_class": "NSAIDs", "atc_code": "M01AB05", "brand_names": "Voltaren", "is_otc": False, "route": "oral,topical"},
@@ -236,7 +225,6 @@ DRUGS: list[dict] = [
     {"name": "Fentanyl", "active_ingredient": "fentanyl citrate", "rxnorm_code": "4337", "drug_class": "Opioid Analgesics", "atc_code": "N01AH01", "brand_names": "Duragesic, Sublimaze", "is_otc": False, "route": "IV,transdermal,sublingual"},
     {"name": "Tramadol", "active_ingredient": "tramadol hydrochloride", "rxnorm_code": "10689", "drug_class": "Opioid Analgesics", "atc_code": "N02AX02", "brand_names": "Ultram, ConZip", "is_otc": False, "route": "oral"},
     {"name": "Naloxone", "active_ingredient": "naloxone hydrochloride", "rxnorm_code": "7234", "drug_class": "Opioid Antagonists", "atc_code": "V03AB15", "brand_names": "Narcan, Evzio", "is_otc": False, "route": "IV,intranasal,IM"},
-    # --- Psychiatric / Neurological ---
     {"name": "Sertraline", "active_ingredient": "sertraline hydrochloride", "rxnorm_code": "36437", "drug_class": "SSRIs", "atc_code": "N06AB06", "brand_names": "Zoloft", "is_otc": False, "route": "oral"},
     {"name": "Fluoxetine", "active_ingredient": "fluoxetine hydrochloride", "rxnorm_code": "4493", "drug_class": "SSRIs", "atc_code": "N06AB03", "brand_names": "Prozac, Sarafem", "is_otc": False, "route": "oral"},
     {"name": "Escitalopram", "active_ingredient": "escitalopram oxalate", "rxnorm_code": "321988", "drug_class": "SSRIs", "atc_code": "N06AB10", "brand_names": "Lexapro", "is_otc": False, "route": "oral"},
@@ -265,7 +253,6 @@ DRUGS: list[dict] = [
     {"name": "Carbamazepine", "active_ingredient": "carbamazepine", "rxnorm_code": "2002", "drug_class": "Antiepileptics", "atc_code": "N03AF01", "brand_names": "Tegretol, Carbatrol", "is_otc": False, "route": "oral"},
     {"name": "Gabapentin", "active_ingredient": "gabapentin", "rxnorm_code": "25480", "drug_class": "Antiepileptics", "atc_code": "N03AX12", "brand_names": "Neurontin, Gralise", "is_otc": False, "route": "oral"},
     {"name": "Levetiracetam", "active_ingredient": "levetiracetam", "rxnorm_code": "83635", "drug_class": "Antiepileptics", "atc_code": "N03AX14", "brand_names": "Keppra", "is_otc": False, "route": "oral,IV"},
-    # --- Antibiotics ---
     {"name": "Amoxicillin", "active_ingredient": "amoxicillin", "rxnorm_code": "723", "drug_class": "Penicillins", "atc_code": "J01CA04", "brand_names": "Amoxil, Trimox", "is_otc": False, "route": "oral"},
     {"name": "Ampicillin", "active_ingredient": "ampicillin", "rxnorm_code": "733", "drug_class": "Penicillins", "atc_code": "J01CA01", "brand_names": "Principen", "is_otc": False, "route": "oral,IV"},
     {"name": "Piperacillin-Tazobactam", "active_ingredient": "piperacillin sodium / tazobactam sodium", "rxnorm_code": "203134", "drug_class": "Penicillins", "atc_code": "J01CR05", "brand_names": "Zosyn", "is_otc": False, "route": "IV"},
@@ -286,25 +273,20 @@ DRUGS: list[dict] = [
     {"name": "Doxycycline", "active_ingredient": "doxycycline hyclate", "rxnorm_code": "3640", "drug_class": "Tetracyclines", "atc_code": "J01AA02", "brand_names": "Vibramycin, Doryx", "is_otc": False, "route": "oral,IV"},
     {"name": "Clindamycin", "active_ingredient": "clindamycin hydrochloride", "rxnorm_code": "2582", "drug_class": "Lincosamide Antibiotics", "atc_code": "J01FF01", "brand_names": "Cleocin", "is_otc": False, "route": "oral,IV"},
     {"name": "Gentamicin", "active_ingredient": "gentamicin sulfate", "rxnorm_code": "4700", "drug_class": "Aminoglycoside Antibiotics", "atc_code": "J01GB03", "brand_names": "Garamycin", "is_otc": False, "route": "IV,IM"},
-    # --- Steroids / Anti-inflammatory ---
     {"name": "Prednisone", "active_ingredient": "prednisone", "rxnorm_code": "8640", "drug_class": "Corticosteroids", "atc_code": "H02AB07", "brand_names": "Deltasone, Rayos", "is_otc": False, "route": "oral"},
     {"name": "Methylprednisolone", "active_ingredient": "methylprednisolone sodium succinate", "rxnorm_code": "41493", "drug_class": "Corticosteroids", "atc_code": "H02AB04", "brand_names": "Solu-Medrol, Medrol", "is_otc": False, "route": "oral,IV"},
     {"name": "Dexamethasone", "active_ingredient": "dexamethasone", "rxnorm_code": "3264", "drug_class": "Corticosteroids", "atc_code": "H02AB02", "brand_names": "Decadron", "is_otc": False, "route": "oral,IV,IM"},
-    # --- GI ---
     {"name": "Omeprazole", "active_ingredient": "omeprazole", "rxnorm_code": "7646", "drug_class": "Proton Pump Inhibitors", "atc_code": "A02BC01", "brand_names": "Prilosec", "is_otc": True, "route": "oral"},
     {"name": "Pantoprazole", "active_ingredient": "pantoprazole sodium", "rxnorm_code": "40790", "drug_class": "Proton Pump Inhibitors", "atc_code": "A02BC02", "brand_names": "Protonix", "is_otc": False, "route": "oral,IV"},
     {"name": "Lansoprazole", "active_ingredient": "lansoprazole", "rxnorm_code": "17128", "drug_class": "Proton Pump Inhibitors", "atc_code": "A02BC03", "brand_names": "Prevacid", "is_otc": True, "route": "oral"},
     {"name": "Ondansetron", "active_ingredient": "ondansetron hydrochloride", "rxnorm_code": "312087", "drug_class": "5-HT3 Antagonists (Antiemetics)", "atc_code": "A04AA01", "brand_names": "Zofran", "is_otc": False, "route": "oral,IV"},
-    # --- Immunosuppressants ---
     {"name": "Tacrolimus", "active_ingredient": "tacrolimus", "rxnorm_code": "10582", "drug_class": "Immunosuppressants (Calcineurin Inhibitors)", "atc_code": "L04AD02", "brand_names": "Prograf, Astagraf XL", "is_otc": False, "route": "oral,IV"},
     {"name": "Cyclosporine", "active_ingredient": "cyclosporine", "rxnorm_code": "3008", "drug_class": "Immunosuppressants (Calcineurin Inhibitors)", "atc_code": "L04AD01", "brand_names": "Neoral, Sandimmune", "is_otc": False, "route": "oral,IV"},
-    # --- CYP3A4 key inhibitors / inducers ---
     {"name": "Ketoconazole", "active_ingredient": "ketoconazole", "rxnorm_code": "6085", "drug_class": "CYP3A4 Inhibitors", "atc_code": "J02AB02", "brand_names": "Nizoral", "is_otc": False, "route": "oral,topical"},
     {"name": "Itraconazole", "active_ingredient": "itraconazole", "rxnorm_code": "28031", "drug_class": "CYP3A4 Inhibitors", "atc_code": "J02AC02", "brand_names": "Sporanox", "is_otc": False, "route": "oral"},
     {"name": "Fluconazole", "active_ingredient": "fluconazole", "rxnorm_code": "4450", "drug_class": "CYP3A4 Inhibitors", "atc_code": "J02AC01", "brand_names": "Diflucan", "is_otc": False, "route": "oral,IV"},
     {"name": "Rifampin", "active_ingredient": "rifampin", "rxnorm_code": "9384", "drug_class": "CYP3A4 Inducers", "atc_code": "J04AB02", "brand_names": "Rifadin, Rimactane", "is_otc": False, "route": "oral,IV"},
     {"name": "Rifabutin", "active_ingredient": "rifabutin", "rxnorm_code": "35617", "drug_class": "CYP3A4 Inducers", "atc_code": "J04AB04", "brand_names": "Mycobutin", "is_otc": False, "route": "oral"},
-    # --- Other commonly used drugs ---
     {"name": "Albuterol", "active_ingredient": "albuterol sulfate", "rxnorm_code": "435", "drug_class": "Beta-2 Agonists (Bronchodilators)", "atc_code": "R03AC02", "brand_names": "ProAir, Ventolin, Proventil", "is_otc": False, "route": "inhaled"},
     {"name": "Tiotropium", "active_ingredient": "tiotropium bromide", "rxnorm_code": "274783", "drug_class": "Anticholinergic Bronchodilators", "atc_code": "R03BB04", "brand_names": "Spiriva", "is_otc": False, "route": "inhaled"},
     {"name": "Budesonide", "active_ingredient": "budesonide", "rxnorm_code": "19831", "drug_class": "Inhaled Corticosteroids", "atc_code": "R03BA02", "brand_names": "Pulmicort, Rhinocort", "is_otc": False, "route": "inhaled,nasal"},
@@ -316,13 +298,7 @@ DRUGS: list[dict] = [
     {"name": "Azathioprine", "active_ingredient": "azathioprine", "rxnorm_code": "1256", "drug_class": "Immunosuppressants (Thiopurines)", "atc_code": "L04AX01", "brand_names": "Imuran", "is_otc": False, "route": "oral,IV"},
 ]
 
-# ---------------------------------------------------------------------------
-# Drug–Drug Interaction pairs
-# Severity: contraindicated | major | moderate | minor
-# Evidence: A (excellent RCT evidence) | B (good evidence) | C (fair) | D (case reports)
-# ---------------------------------------------------------------------------
 DDI_PAIRS: list[dict] = [
-    # ---- Serotonin Syndrome ----
     {
         "drug_a": "Sertraline", "drug_b": "Tramadol",
         "severity": "major",
@@ -377,7 +353,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "A",
         "reference_source": "FDA",
     },
-    # ---- QT Prolongation ----
     {
         "drug_a": "Ciprofloxacin", "drug_b": "Amiodarone",
         "severity": "major",
@@ -432,7 +407,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "B",
         "reference_source": "FDA",
     },
-    # ---- Bleeding Risk ----
     {
         "drug_a": "Warfarin", "drug_b": "Aspirin",
         "severity": "major",
@@ -478,7 +452,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "A",
         "reference_source": "FDA",
     },
-    # ---- CYP pharmacokinetic interactions ----
     {
         "drug_a": "Clarithromycin", "drug_b": "Simvastatin",
         "severity": "contraindicated",
@@ -578,7 +551,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "B",
         "reference_source": "FDA",
     },
-    # ---- Nephrotoxic / Hyperkalemia ----
     {
         "drug_a": "Lisinopril", "drug_b": "Spironolactone",
         "severity": "major",
@@ -615,7 +587,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "A",
         "reference_source": "FDA",
     },
-    # ---- Muscle toxicity / Rhabdomyolysis ----
     {
         "drug_a": "Colchicine", "drug_b": "Atorvastatin",
         "severity": "major",
@@ -634,7 +605,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "A",
         "reference_source": "FDA",
     },
-    # ---- CNS Depression ----
     {
         "drug_a": "Diazepam", "drug_b": "Morphine",
         "severity": "major",
@@ -671,7 +641,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "A",
         "reference_source": "FDA",
     },
-    # ---- Hypoglycemia risk ----
     {
         "drug_a": "Metformin", "drug_b": "Glipizide",
         "severity": "moderate",
@@ -690,7 +659,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "B",
         "reference_source": "FDA",
     },
-    # ---- Digoxin toxicity ----
     {
         "drug_a": "Amiodarone", "drug_b": "Digoxin",
         "severity": "major",
@@ -709,7 +677,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "A",
         "reference_source": "Lexicomp",
     },
-    # ---- Bradycardia / AV block ----
     {
         "drug_a": "Metoprolol", "drug_b": "Diltiazem",
         "severity": "major",
@@ -728,7 +695,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "A",
         "reference_source": "FDA",
     },
-    # ---- Steven-Johnson / Hypersensitivity ----
     {
         "drug_a": "Allopurinol", "drug_b": "Ampicillin",
         "severity": "moderate",
@@ -738,7 +704,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "B",
         "reference_source": "Lexicomp",
     },
-    # ---- Metformin – contrast / renal ----
     {
         "drug_a": "Metformin", "drug_b": "Vancomycin",
         "severity": "moderate",
@@ -748,7 +713,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "C",
         "reference_source": "Literature",
     },
-    # ---- Lithium toxicity ----
     {
         "drug_a": "Lithium", "drug_b": "Hydrochlorothiazide",
         "severity": "major",
@@ -767,7 +731,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "A",
         "reference_source": "FDA",
     },
-    # ---- Clopidogrel – drug interactions ----
     {
         "drug_a": "Clopidogrel", "drug_b": "Omeprazole",
         "severity": "moderate",
@@ -777,7 +740,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "B",
         "reference_source": "FDA",
     },
-    # ---- Antibiotic-anticoagulant ----
     {
         "drug_a": "Ciprofloxacin", "drug_b": "Warfarin",
         "severity": "major",
@@ -796,7 +758,6 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "A",
         "reference_source": "FDA",
     },
-    # ---- Miscellaneous high-yield ----
     {
         "drug_a": "Levothyroxine", "drug_b": "Calcium Channel Blockers",
         "severity": "minor",
@@ -851,11 +812,447 @@ DDI_PAIRS: list[dict] = [
         "evidence_level": "A",
         "reference_source": "FDA",
     },
+
+    {
+        "drug_a": "Apixaban", "drug_b": "Aspirin",
+        "severity": "major",
+        "mechanism": "additive_bleeding_risk",
+        "description": "Combining oral anticoagulant with antiplatelet significantly increases major and intracranial bleeding risk.",
+        "management": "Avoid unless benefit clearly outweighs risk (e.g. ACS + AF). Use lowest aspirin dose (81 mg). Monitor for bleeding.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Apixaban", "drug_b": "Naproxen",
+        "severity": "major",
+        "mechanism": "additive_bleeding_risk_gi",
+        "description": "NSAIDs inhibit platelet function and damage GI mucosa, greatly increasing GI bleeding risk when combined with anticoagulants.",
+        "management": "Avoid concurrent use. If NSAID needed, use lowest dose shortest duration with a PPI. Consider acetaminophen instead.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Apixaban", "drug_b": "Diclofenac",
+        "severity": "major",
+        "mechanism": "additive_bleeding_risk_gi",
+        "description": "NSAIDs combined with direct oral anticoagulants increase GI bleeding risk 3–4 fold.",
+        "management": "Avoid. Use acetaminophen for analgesia. Add PPI if NSAID cannot be avoided.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Apixaban", "drug_b": "Celecoxib",
+        "severity": "moderate",
+        "mechanism": "additive_bleeding_risk",
+        "description": "Selective COX-2 inhibitor carries lower GI bleeding risk than non-selective NSAIDs but still increases bleeding risk with anticoagulants.",
+        "management": "Use with caution. Monitor for signs of bleeding. Add PPI.",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Apixaban", "drug_b": "Ticagrelor",
+        "severity": "major",
+        "mechanism": "additive_bleeding_anticoagulant_antiplatelet",
+        "description": "Triple therapy (anticoagulant + 2 antiplatelets) dramatically increases major bleeding. Dual pathway inhibition without adequate benefit in most patients.",
+        "management": "Limit to shortest possible duration post-ACS stenting. Reassess regularly. Use PPI.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Dabigatran", "drug_b": "Aspirin",
+        "severity": "major",
+        "mechanism": "additive_bleeding_risk",
+        "description": "Dabigatran with aspirin increases major bleeding risk. The combination is common in AF + CAD patients and requires careful risk-benefit assessment.",
+        "management": "Avoid unless clearly indicated. Monitor closely. Use lowest aspirin dose.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Dabigatran", "drug_b": "Naproxen",
+        "severity": "major",
+        "mechanism": "additive_bleeding_risk_gi",
+        "description": "NSAIDs increase GI bleeding risk with all anticoagulants including dabigatran.",
+        "management": "Avoid. Use acetaminophen instead.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Fentanyl", "drug_b": "Sertraline",
+        "severity": "major",
+        "mechanism": "serotonin_syndrome_risk",
+        "description": "Fentanyl has weak serotonin reuptake inhibition. Combined with SSRIs increases serotonin syndrome risk.",
+        "management": "Use lowest effective fentanyl dose. Monitor for agitation, fever, tachycardia, myoclonus (serotonin syndrome signs).",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Fentanyl", "drug_b": "Midazolam",
+        "severity": "major",
+        "mechanism": "additive_cns_respiratory_depression",
+        "description": "Combined opioid and benzodiazepine causes profound CNS and respiratory depression. This combination carries a black box FDA warning.",
+        "management": "Use only when no alternative. Reduce doses of both. Have resuscitation equipment available. Monitor continuously.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Fentanyl", "drug_b": "Diazepam",
+        "severity": "major",
+        "mechanism": "additive_cns_respiratory_depression",
+        "description": "Opioid + benzodiazepine combination carries FDA black box warning for respiratory depression and death.",
+        "management": "Avoid unless strictly necessary. Monitor O2 saturation continuously. Have naloxone available.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Amlodipine", "drug_b": "Simvastatin",
+        "severity": "moderate",
+        "mechanism": "cyp3a4_inhibition_increased_statin_exposure",
+        "description": "Amlodipine mildly inhibits CYP3A4, increasing simvastatin exposure and myopathy/rhabdomyolysis risk.",
+        "management": "Limit simvastatin to 20 mg/day when co-prescribed with amlodipine. Consider switching to rosuvastatin or pravastatin (not CYP3A4 metabolised).",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Amlodipine", "drug_b": "Clarithromycin",
+        "severity": "major",
+        "mechanism": "cyp3a4_inhibition_increased_amlodipine_levels",
+        "description": "Clarithromycin is a potent CYP3A4 inhibitor. Significantly raises amlodipine levels causing hypotension.",
+        "management": "Monitor BP closely. Consider azithromycin as alternative. Reduce amlodipine dose if necessary.",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Amlodipine", "drug_b": "Rifampicin",
+        "severity": "major",
+        "mechanism": "cyp3a4_induction_reduced_amlodipine_levels",
+        "description": "Rifampicin is a potent CYP3A4 inducer, dramatically reducing amlodipine plasma levels and antihypertensive efficacy.",
+        "management": "Avoid combination. If unavoidable, significantly increase amlodipine dose and monitor BP. Consider alternative antihypertensive.",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Escitalopram", "drug_b": "Tramadol",
+        "severity": "major",
+        "mechanism": "serotonin_syndrome_risk",
+        "description": "SSRI + weak serotonergic opioid. Increases serotonin syndrome risk significantly.",
+        "management": "Avoid. Use non-serotonergic analgesic (e.g. acetaminophen, NSAIDs) instead.",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Escitalopram", "drug_b": "Linezolid",
+        "severity": "contraindicated",
+        "mechanism": "maoi_serotonin_syndrome",
+        "description": "Linezolid has MAO inhibitor activity. Combined with any SSRI risks life-threatening serotonin syndrome.",
+        "management": "Contraindicated. Stop SSRI at least 14 days before linezolid. Wait 14 days after linezolid before restarting SSRI.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Citalopram", "drug_b": "Ondansetron",
+        "severity": "contraindicated",
+        "mechanism": "additive_qt_prolongation",
+        "description": "Both drugs prolong the QT interval. Combination significantly increases risk of Torsades de Pointes and ventricular arrhythmia.",
+        "management": "Contraindicated. Use alternative antiemetic (e.g. metoclopramide). If unavoidable, ECG monitoring required.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Paroxetine", "drug_b": "Tamoxifen",
+        "severity": "major",
+        "mechanism": "cyp2d6_inhibition_reduced_tamoxifen_activation",
+        "description": "Paroxetine is a potent CYP2D6 inhibitor. Tamoxifen requires CYP2D6 for activation to endoxifen (active metabolite). Co-use may reduce tamoxifen efficacy in breast cancer treatment.",
+        "management": "Avoid combination in breast cancer patients on tamoxifen. Use alternative antidepressant (e.g. venlafaxine, citalopram) with less CYP2D6 inhibition.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Amitriptyline", "drug_b": "Sertraline",
+        "severity": "major",
+        "mechanism": "serotonin_syndrome_cyp2d6_inhibition",
+        "description": "TCAs combined with SSRIs risk serotonin syndrome. SSRIs also inhibit TCA metabolism via CYP2D6, raising TCA plasma levels.",
+        "management": "Avoid combination. If needed, use lowest doses of both and monitor for serotonin syndrome and TCA toxicity (arrhythmia, anticholinergic effects).",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Amitriptyline", "drug_b": "Haloperidol",
+        "severity": "major",
+        "mechanism": "additive_qt_prolongation_anticholinergic",
+        "description": "Both drugs prolong QT interval and have anticholinergic effects. Combined use significantly increases arrhythmia and anticholinergic toxicity risk.",
+        "management": "Avoid. Monitor ECG. If used together, use lowest effective doses and monitor QTc.",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Clomipramine", "drug_b": "Tramadol",
+        "severity": "major",
+        "mechanism": "serotonin_syndrome_risk_lowered_seizure_threshold",
+        "description": "TCAs combined with tramadol increase serotonin syndrome risk and also lower seizure threshold synergistically.",
+        "management": "Avoid. Use alternative analgesic.",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Furosemide", "drug_b": "Gentamicin",
+        "severity": "major",
+        "mechanism": "additive_ototoxicity_nephrotoxicity",
+        "description": "Loop diuretics and aminoglycosides have additive ototoxicity and nephrotoxicity. Risk is proportional to dose and duration.",
+        "management": "Avoid prolonged concurrent use. Monitor renal function and hearing. Use minimum effective doses. Prefer once-daily aminoglycoside dosing.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Furosemide", "drug_b": "Lithium",
+        "severity": "major",
+        "mechanism": "sodium_depletion_lithium_retention",
+        "description": "Loop diuretics cause sodium depletion, prompting renal tubular lithium reabsorption and lithium toxicity.",
+        "management": "Avoid if possible. If co-prescribed, monitor lithium levels weekly. Maintain adequate sodium intake. Thiazides carry even higher risk.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Furosemide", "drug_b": "Digoxin",
+        "severity": "major",
+        "mechanism": "hypokalemia_increased_digoxin_toxicity",
+        "description": "Furosemide causes hypokalemia, which potentiates digoxin toxicity at normal digoxin levels.",
+        "management": "Monitor serum K+ and digoxin levels. Supplement potassium. Target K+ > 4.0 mEq/L in patients on digoxin.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Furosemide", "drug_b": "Lisinopril",
+        "severity": "moderate",
+        "mechanism": "additive_hypotension_first_dose",
+        "description": "ACE inhibitors combined with loop diuretics can cause severe first-dose hypotension, especially in volume-depleted patients.",
+        "management": "Start ACEi at lowest dose. Hold diuretic 24h before first ACEi dose in high-risk patients. Monitor BP.",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Valproate", "drug_b": "Lamotrigine",
+        "severity": "major",
+        "mechanism": "ugt_inhibition_increased_lamotrigine_levels",
+        "description": "Valproate inhibits UGT glucuronidation, doubling lamotrigine plasma levels. Increases risk of lamotrigine toxicity (rash, Stevens-Johnson syndrome).",
+        "management": "Halve lamotrigine dose when adding valproate. Titrate very slowly. Monitor for rash.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Valproate", "drug_b": "Carbamazepine",
+        "severity": "moderate",
+        "mechanism": "cyp_induction_reduced_valproate_levels",
+        "description": "Carbamazepine induces valproate metabolism, reducing valproate levels. Valproate also inhibits carbamazepine-epoxide clearance, increasing toxic metabolite.",
+        "management": "Monitor both drug levels. May need to increase valproate dose. Watch for carbamazepine toxicity symptoms.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Valproate", "drug_b": "Aspirin",
+        "severity": "moderate",
+        "mechanism": "protein_displacement_increased_valproate_free_fraction",
+        "description": "High-dose aspirin displaces valproate from protein binding, increasing free (active) valproate levels. Also increases bleeding risk.",
+        "management": "Avoid high-dose aspirin. Use acetaminophen for analgesia. Monitor valproate levels.",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Erythromycin", "drug_b": "Simvastatin",
+        "severity": "major",
+        "mechanism": "cyp3a4_inhibition_statin_myopathy",
+        "description": "Erythromycin is a potent CYP3A4 inhibitor. Dramatically increases simvastatin exposure, causing myopathy/rhabdomyolysis.",
+        "management": "Temporarily suspend simvastatin during erythromycin course. Switch to pravastatin or rosuvastatin if antibiotic needed long-term.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Erythromycin", "drug_b": "Warfarin",
+        "severity": "major",
+        "mechanism": "cyp2c9_inhibition_increased_inr",
+        "description": "Macrolide antibiotics inhibit CYP enzymes metabolising warfarin, raising INR and bleeding risk.",
+        "management": "Monitor INR 2–3 days after starting erythromycin. Reduce warfarin dose by 20–25% preemptively in stable patients.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Levofloxacin", "drug_b": "Amiodarone",
+        "severity": "contraindicated",
+        "mechanism": "additive_qt_prolongation",
+        "description": "Both drugs significantly prolong QT interval. Combination markedly increases risk of Torsades de Pointes.",
+        "management": "Contraindicated. Use alternative antibiotic (e.g. azithromycin is safer, beta-lactam preferred). ECG mandatory if combination unavoidable.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Levofloxacin", "drug_b": "Haloperidol",
+        "severity": "major",
+        "mechanism": "additive_qt_prolongation",
+        "description": "Both drugs prolong QT. Combination increases Torsades de Pointes risk.",
+        "management": "Avoid. Use alternative antibiotic. If unavoidable, ECG monitoring, correct electrolytes.",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Olanzapine", "drug_b": "Lorazepam",
+        "severity": "major",
+        "mechanism": "additive_cns_respiratory_depression",
+        "description": "IV/IM combination of olanzapine and benzodiazepines has caused respiratory arrest and death. FDA black box warning.",
+        "management": "Avoid parenteral combination. If both needed, use oral route with at least 1-hour separation. Monitor breathing.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Risperidone", "drug_b": "Carbamazepine",
+        "severity": "major",
+        "mechanism": "cyp3a4_induction_reduced_risperidone_levels",
+        "description": "Carbamazepine induces CYP3A4, reducing risperidone plasma levels by up to 50%, risking therapeutic failure.",
+        "management": "Double risperidone dose when adding carbamazepine. Monitor clinical response. Consider alternative antipsychotic.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Ticagrelor", "drug_b": "Aspirin",
+        "severity": "moderate",
+        "mechanism": "additive_antiplatelet_bleeding_risk",
+        "description": "Dual antiplatelet therapy (DAPT) — standard post-ACS/PCI regimen but increases bleeding risk. High-dose aspirin reduces ticagrelor efficacy.",
+        "management": "Use low-dose aspirin (75–100 mg only) with ticagrelor. Higher aspirin doses reduce ticagrelor's net clinical benefit.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Ticagrelor", "drug_b": "Clarithromycin",
+        "severity": "major",
+        "mechanism": "cyp3a4_inhibition_increased_ticagrelor_levels",
+        "description": "Potent CYP3A4 inhibitors increase ticagrelor exposure up to 7-fold, increasing bleeding risk.",
+        "management": "Contraindicated per FDA labelling. Avoid all strong CYP3A4 inhibitors with ticagrelor.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Ticagrelor", "drug_b": "Simvastatin",
+        "severity": "moderate",
+        "mechanism": "cyp3a4_competition_increased_statin_exposure",
+        "description": "Ticagrelor inhibits CYP3A4, increasing simvastatin levels and myopathy risk.",
+        "management": "Limit simvastatin to 40 mg/day. Consider rosuvastatin instead.",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Enalapril", "drug_b": "Spironolactone",
+        "severity": "major",
+        "mechanism": "additive_hyperkalemia_risk",
+        "description": "ACE inhibitor + potassium-sparing diuretic combination causes significant hyperkalemia risk, especially in renal impairment.",
+        "management": "Monitor K+ weekly initially. Target K+ < 5.0 mEq/L. Avoid in severe renal impairment (eGFR < 30).",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Ramipril", "drug_b": "Spironolactone",
+        "severity": "major",
+        "mechanism": "additive_hyperkalemia_risk",
+        "description": "ACE inhibitor + aldosterone antagonist — additive potassium retention. Life-threatening hyperkalemia risk in CKD patients.",
+        "management": "Monitor serum K+ and creatinine closely. Use lowest effective doses. Avoid K+ supplements.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Ramipril", "drug_b": "Naproxen",
+        "severity": "moderate",
+        "mechanism": "nsaid_reduces_ace_efficacy_and_nephrotoxicity",
+        "description": "NSAIDs reduce the antihypertensive efficacy of ACE inhibitors and can cause acute kidney injury in combination.",
+        "management": "Avoid NSAIDs in patients on ACE inhibitors with CKD or heart failure. Use acetaminophen.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Carvedilol", "drug_b": "Verapamil",
+        "severity": "major",
+        "mechanism": "additive_negative_chronotropy_dromotropy",
+        "description": "Both drugs slow AV conduction. Combination risks severe bradycardia and complete heart block.",
+        "management": "Avoid. Monitor HR and ECG closely if combination unavoidable. Never give IV verapamil to patients on beta-blockers.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Propranolol", "drug_b": "Verapamil",
+        "severity": "major",
+        "mechanism": "additive_negative_chronotropy_dromotropy",
+        "description": "Beta-blocker + non-dihydropyridine CCB. Additive AV nodal blockade risks bradycardia, hypotension, and heart block.",
+        "management": "Contraindicated IV combination. Oral combination requires ECG monitoring and specialist oversight.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Propranolol", "drug_b": "Epinephrine",
+        "severity": "major",
+        "mechanism": "alpha_rebound_hypertension",
+        "description": "Non-selective beta-blockade with propranolol leaves alpha-adrenergic receptors unopposed when epinephrine is given, causing severe hypertension and reflex bradycardia.",
+        "management": "Use cardioselective beta-blocker (metoprolol) instead. If epinephrine emergency required in propranolol-treated patient, use lowest dose and monitor BP continuously.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Clindamycin", "drug_b": "Erythromycin",
+        "severity": "contraindicated",
+        "mechanism": "same_ribosomal_binding_site_antagonism",
+        "description": "Both bind the 50S ribosomal subunit at overlapping sites. Antagonistic — use of one reduces efficacy of the other.",
+        "management": "Never co-prescribe. Use only one at a time.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Duloxetine", "drug_b": "Tramadol",
+        "severity": "major",
+        "mechanism": "serotonin_syndrome_risk",
+        "description": "SNRI + serotonergic opioid. Duloxetine inhibits both serotonin and norepinephrine reuptake; tramadol also inhibits serotonin reuptake.",
+        "management": "Avoid. Use non-serotonergic analgesic.",
+        "evidence_level": "B",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Duloxetine", "drug_b": "Linezolid",
+        "severity": "contraindicated",
+        "mechanism": "maoi_serotonin_syndrome",
+        "description": "Linezolid MAO inhibitor activity combined with SNRI causes life-threatening serotonin syndrome.",
+        "management": "Contraindicated. Stop duloxetine at least 5 days before linezolid.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+
+    {
+        "drug_a": "Valsartan", "drug_b": "Spironolactone",
+        "severity": "major",
+        "mechanism": "additive_hyperkalemia_risk",
+        "description": "ARB + aldosterone antagonist causes significant potassium retention. Life-threatening hyperkalemia especially in CKD.",
+        "management": "Monitor K+ and creatinine regularly. Avoid in eGFR < 45 unless closely monitored.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
+    {
+        "drug_a": "Valsartan", "drug_b": "Lisinopril",
+        "severity": "contraindicated",
+        "mechanism": "dual_ras_blockade_hyperkalemia_renal_failure",
+        "description": "Dual RAS blockade (ARB + ACEi) — no added cardiovascular benefit and significantly increased risk of hypotension, hyperkalemia, and AKI.",
+        "management": "Contraindicated per ACC/AHA guidelines outside of specific specialist-supervised protocols.",
+        "evidence_level": "A",
+        "reference_source": "FDA",
+    },
 ]
 
-# ---------------------------------------------------------------------------
-# Pharmacological risk groups for class-level DDI detection
-# ---------------------------------------------------------------------------
 INTERACTION_GROUPS: list[dict] = [
     {
         "name": "QT-Prolonging Drugs",
@@ -913,15 +1310,13 @@ INTERACTION_GROUPS: list[dict] = [
     },
 ]
 
-# ---------------------------------------------------------------------------
-# Allergy cross-reactivity groups
-# ---------------------------------------------------------------------------
 ALLERGEN_GROUPS: list[dict] = [
     {
         "name": "Beta-lactam Antibiotics",
         "description": "Penicillins, cephalosporins, carbapenems, and monobactams share beta-lactam ring structural features. Cross-reactivity risk exists, highest between penicillins and first-generation cephalosporins.",
         "reaction_types": "anaphylaxis, urticaria, maculopapular rash, serum sickness",
         "includes_classes": "Penicillins, Cephalosporins, Carbapenems",
+        "trigger_substances": ["Penicillin", "Penicillins", "Amoxicillin", "Ampicillin", "Cephalosporin", "Cephalosporins", "Beta-lactam", "Beta-lactams", "Cefazolin", "Ceftriaxone", "Cephalexin", "Cefepime", "Meropenem", "Piperacillin"],
         "members": ["Amoxicillin", "Ampicillin", "Piperacillin-Tazobactam", "Cephalexin", "Cefazolin", "Ceftriaxone", "Cefepime", "Meropenem"],
         "cross_reacts_with": [],
     },
@@ -930,6 +1325,7 @@ ALLERGEN_GROUPS: list[dict] = [
         "description": "Sulfonamide antimicrobials (TMP-SMX) can cross-react with sulfonamide non-antibiotics in some patients, though evidence is debated.",
         "reaction_types": "Stevens-Johnson syndrome, toxic epidermal necrolysis, urticaria, maculopapular rash, agranulocytosis",
         "includes_classes": "Sulfonamides",
+        "trigger_substances": ["Sulfonamide", "Sulfonamides", "Sulfa", "TMP-SMX", "Trimethoprim-Sulfamethoxazole", "Bactrim", "Septra", "Sulfamethoxazole"],
         "members": ["Trimethoprim-Sulfamethoxazole"],
         "cross_reacts_with": ["Sulfonamide Non-Antibiotics (Controversial)"],
     },
@@ -938,6 +1334,7 @@ ALLERGEN_GROUPS: list[dict] = [
         "description": "Non-selective COX inhibitors can cross-react via pharmacological mechanism (not immunological). Patients with aspirin-exacerbated respiratory disease react to all non-selective NSAIDs.",
         "reaction_types": "urticaria, angioedema, bronchospasm, anaphylaxis",
         "includes_classes": "NSAIDs",
+        "trigger_substances": ["Aspirin", "NSAIDs", "NSAID", "Ibuprofen", "Naproxen", "Diclofenac", "Celecoxib", "Aspirin-exacerbated", "Cox inhibitor"],
         "members": ["Aspirin", "Ibuprofen", "Naproxen", "Diclofenac"],
         "cross_reacts_with": [],
     },
@@ -946,6 +1343,7 @@ ALLERGEN_GROUPS: list[dict] = [
         "description": "Cross-sensitivity among fluoroquinolones exists; patients allergic to one should be treated with caution when another is prescribed.",
         "reaction_types": "anaphylaxis, phototoxicity, rash, tendinopathy",
         "includes_classes": "Fluoroquinolones",
+        "trigger_substances": ["Fluoroquinolone", "Fluoroquinolones", "Quinolone", "Quinolones", "Ciprofloxacin", "Levofloxacin", "Moxifloxacin"],
         "members": ["Ciprofloxacin", "Levofloxacin", "Moxifloxacin"],
         "cross_reacts_with": [],
     },
@@ -954,6 +1352,7 @@ ALLERGEN_GROUPS: list[dict] = [
         "description": "Allergy to one opioid does not reliably predict allergy to others; most opioid reactions are non-immune histamine release. True IgE-mediated opioid allergy is rare.",
         "reaction_types": "urticaria, pruritus, flushing, angioedema, anaphylaxis (rare)",
         "includes_classes": "Opioid Analgesics",
+        "trigger_substances": ["Opioid", "Opioids", "Morphine", "Codeine", "Oxycodone", "Hydrocodone", "Fentanyl", "Tramadol", "Opiate"],
         "members": ["Morphine", "Oxycodone", "Hydrocodone", "Fentanyl", "Tramadol"],
         "cross_reacts_with": [],
     },
@@ -962,6 +1361,7 @@ ALLERGEN_GROUPS: list[dict] = [
         "description": "Myopathy/rhabdomyolysis from one statin may not repeat with another. True allergy to statin moiety is rare.",
         "reaction_types": "myopathy, rhabdomyolysis, hepatotoxicity, hypersensitivity rash",
         "includes_classes": "Statins (HMG-CoA Reductase Inhibitors)",
+        "trigger_substances": ["Statin", "Statins", "Atorvastatin", "Simvastatin", "Rosuvastatin", "HMG-CoA"],
         "members": ["Atorvastatin", "Rosuvastatin", "Simvastatin"],
         "cross_reacts_with": [],
     },
@@ -970,6 +1370,7 @@ ALLERGEN_GROUPS: list[dict] = [
         "description": "Angioedema is a class effect of ACE inhibitors (bradykinin accumulation), not an immunological allergy. Observed in 0.1–0.7% of patients.",
         "reaction_types": "angioedema (lip, tongue, throat — can be life-threatening)",
         "includes_classes": "ACE Inhibitors",
+        "trigger_substances": ["ACE inhibitor", "ACEi", "Lisinopril", "Enalapril", "Ramipril", "ACE", "Captopril"],
         "members": ["Lisinopril", "Enalapril", "Ramipril"],
         "cross_reacts_with": ["Angiotensin Receptor Blockers (ARBs)"],
     },
@@ -978,6 +1379,7 @@ ALLERGEN_GROUPS: list[dict] = [
         "description": "ARBs have much lower angioedema risk than ACEi but may cause angioedema in patients who previously experienced ACEi-induced angioedema (~10% cross-incidence).",
         "reaction_types": "angioedema",
         "includes_classes": "Angiotensin Receptor Blockers (ARBs)",
+        "trigger_substances": ["ARB", "ARBs", "Losartan", "Valsartan", "Sartans"],
         "members": ["Losartan", "Valsartan"],
         "cross_reacts_with": ["ACE Inhibitor Angioedema Risk"],
     },
@@ -986,6 +1388,7 @@ ALLERGEN_GROUPS: list[dict] = [
         "description": "Cross-sensitivity within macrolides. Patients allergic to one macrolide generally cannot safely receive another.",
         "reaction_types": "hepatotoxicity (cholestatic), rash, anaphylaxis (rare)",
         "includes_classes": "Macrolide Antibiotics",
+        "trigger_substances": ["Macrolide", "Macrolides", "Azithromycin", "Clarithromycin", "Erythromycin", "Zithromax"],
         "members": ["Azithromycin", "Clarithromycin", "Erythromycin"],
         "cross_reacts_with": [],
     },
@@ -994,7 +1397,48 @@ ALLERGEN_GROUPS: list[dict] = [
         "description": "Iodine-containing compounds including contrast agents.  Prior reaction to contrast doesn't predict reaction to iodine itself or vice versa.",
         "reaction_types": "anaphylactoid reaction, urticaria, bronchospasm",
         "includes_classes": "Imaging Contrast Agents",
+        "trigger_substances": ["Iodine", "Contrast", "Contrast media", "Contrast dye", "Iodinated contrast"],
         "members": [],
+        "cross_reacts_with": [],
+    },
+    {
+        "name": "Aromatic Antiepileptics",
+        "description": "Aromatic antiepileptics (phenytoin, carbamazepine, phenobarbital, and to a lesser extent lamotrigine) share a common aromatic ring structure. Cross-reactivity for severe cutaneous adverse reactions (Stevens-Johnson syndrome, toxic epidermal necrolysis) is estimated at 40-58% between phenytoin and carbamazepine.",
+        "reaction_types": "Stevens-Johnson syndrome, toxic epidermal necrolysis, DRESS syndrome, maculopapular rash, hepatotoxicity",
+        "includes_classes": "Antiepileptics",
+        "trigger_substances": ["Phenytoin", "Carbamazepine", "Phenobarbital", "Dilantin", "Tegretol",
+                               "Aromatic antiepileptic", "Anticonvulsant"],
+        "members": ["Phenytoin", "Carbamazepine"],
+        "cross_reacts_with": [],
+    },
+    {
+        "name": "Sulfonamide Non-Antibiotics (Controversial)",
+        "description": "Diuretics (furosemide, thiazides) and sulfonylureas contain a sulfonamide chemical moiety. True immunological cross-reactivity with sulfonamide antibiotics is debated — current evidence suggests it is rare. However, patients with severe sulfa antibiotic reactions should be monitored when these are prescribed.",
+        "reaction_types": "rash, urticaria (rare), photosensitivity",
+        "includes_classes": "Loop Diuretics, Thiazide Diuretics, Sulfonylureas",
+        "trigger_substances": ["Furosemide", "Hydrochlorothiazide", "Chlorthalidone", "Glipizide", "Glyburide",
+                               "Sulfonamide non-antibiotic", "Thiazide", "Sulfonylurea"],
+        "members": ["Furosemide", "Hydrochlorothiazide", "Chlorthalidone", "Glipizide", "Glyburide"],
+        "cross_reacts_with": ["Sulfonamide Antibiotics"],
+    },
+    {
+        "name": "Azole Antifungals",
+        "description": "Azole antifungals (fluconazole, ketoconazole, itraconazole) share a common triazole/imidazole ring. In-class cross-reactivity can occur for cutaneous reactions. Additionally, all are CYP3A4/2C9 inhibitors — a patient allergic to one should be assessed carefully before switching to another.",
+        "reaction_types": "rash, urticaria, hepatotoxicity, anaphylaxis (rare)",
+        "includes_classes": "CYP3A4 Inhibitors, Antifungals",
+        "trigger_substances": ["Fluconazole", "Ketoconazole", "Itraconazole", "Voriconazole",
+                               "Azole", "Azoles", "Antifungal", "Diflucan"],
+        "members": ["Fluconazole", "Ketoconazole", "Itraconazole"],
+        "cross_reacts_with": [],
+    },
+    {
+        "name": "Benzodiazepines",
+        "description": "True immunological allergy to benzodiazepines is rare. Most adverse reactions are pharmacological (excess CNS depression). However, rare anaphylaxis cases are documented, and in-class cross-reactivity should be assumed for patients with a confirmed immune-mediated reaction to one benzodiazepine.",
+        "reaction_types": "anaphylaxis (rare), urticaria, angioedema, CNS depression",
+        "includes_classes": "Benzodiazepines",
+        "trigger_substances": ["Diazepam", "Lorazepam", "Alprazolam", "Clonazepam", "Midazolam",
+                               "Benzodiazepine", "Benzodiazepines", "Benzo", "Valium", "Ativan"],
+        "members": ["Diazepam", "Lorazepam", "Alprazolam", "Clonazepam"],
         "cross_reacts_with": [],
     },
 ]

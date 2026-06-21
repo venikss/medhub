@@ -3,7 +3,6 @@ from django.contrib import admin
 from .forms import UserAdminChangeForm, UserAdminCreationForm
 from .models import RefreshTokenRecord, User
 
-
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
     form = UserAdminChangeForm
@@ -43,7 +42,6 @@ class UserAdmin(admin.ModelAdmin):
 
     def get_fieldsets(self, request, obj=None):
         return self.add_fieldsets if obj is None else self.fieldsets
-
 
 @admin.register(RefreshTokenRecord)
 class RefreshTokenRecordAdmin(admin.ModelAdmin):

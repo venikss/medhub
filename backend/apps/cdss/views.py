@@ -22,12 +22,13 @@ from rest_framework.views import APIView
 from core.audit import write_audit_log, AuditAction, AuditSeverity
 from core.exceptions import NotFoundError, ConflictError, ValidationAppError
 from core.pagination import StandardPagination
-from core.permissions import IsDoctor, IsAdmin, IsClinicalStaff, IsPharmacist
+from core.permissions import IsDoctor, IsAdmin, IsClinicalStaff, IsPharmacist, IsRadiologist
 
 from .models import (
     CDSSConsultRequest, CDSSConsultRequestStatus, CDSSOutputKind,
     CDSSRecommendation, CDSSOverrideRecord, CDSSStatus,
     CDSSResponseAction, CDSSSeverity,
+    CDSSSourceModule, CDSSRecommendationType,
 )
 from .serializers import (
     CDSSConsultRequestSerializer,
@@ -35,24 +36,17 @@ from .serializers import (
     CDSSOverrideRecordSerializer,
 )
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _get_recommendation(pk):
     try:
         return CDSSRecommendation.objects.select_related("patient").get(id=pk)
     except CDSSRecommendation.DoesNotExist:
         raise NotFoundError("Recommendation not found.")
 
-
 def _get_consult_request(pk):
     try:
         return CDSSConsultRequest.objects.select_related("patient", "requested_by").get(id=pk)
     except CDSSConsultRequest.DoesNotExist:
         raise NotFoundError("CDSS support request not found.")
-
 
 def _record_and_save(rec, action, request, reason="", reason_category="", notes=""):
     """Create an immutable CDSSOverrideRecord and update the recommendation status."""
@@ -68,11 +62,6 @@ def _record_and_save(rec, action, request, reason="", reason_category="", notes=
     )
     return override
 
-
-# ---------------------------------------------------------------------------
-# Recommendations — list / create
-# ---------------------------------------------------------------------------
-
 class CDSSRecommendationListView(APIView):
     """
     GET  /cdss/recommendations  — list, filtered by role/patient/status/severity/type
@@ -83,10 +72,6 @@ class CDSSRecommendationListView(APIView):
     def get(self, request):
         qs = CDSSRecommendation.objects.select_related("patient").all()
 
-        # Role-based visibility.
-        # target_roles__contains=[role] is JSONField array containment — works correctly
-        # on PostgreSQL. On SQLite (dev only) this will silently return all records;
-        # acceptable for local development, must use Postgres in staging/production.
         user_role = getattr(request.user, "role", None)
         if user_role and user_role != "admin":
             qs = qs.filter(Q(target_roles__contains=[user_role]) | Q(target_roles=[]))
@@ -122,7 +107,6 @@ class CDSSRecommendationListView(APIView):
             consult_request.answered_at = timezone.now()
             consult_request.save(update_fields=["status", "answered_at"])
 
-        # Emit websocket event so active sessions receive the alert immediately
         try:
             from core.websockets import emit_cdss_new_recommendation
             emit_cdss_new_recommendation({
@@ -137,7 +121,7 @@ class CDSSRecommendationListView(APIView):
                 "targetRoles": rec.target_roles,
             }, target_roles=rec.target_roles)
         except Exception:
-            pass  # WebSocket emission is non-critical; don't fail the write
+            pass
         write_audit_log(
             request, AuditAction.CREATE, "CDSSRecommendation", str(rec.id),
             {"type": rec.type, "severity": rec.severity},
@@ -146,7 +130,6 @@ class CDSSRecommendationListView(APIView):
             CDSSRecommendationSerializer(rec, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
 
 class CDSSConsultRequestListView(APIView):
     """
@@ -188,7 +171,6 @@ class CDSSConsultRequestListView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class CDSSConsultRequestDetailView(APIView):
     permission_classes = [IsAuthenticated, IsClinicalStaff | IsAdmin]
 
@@ -198,11 +180,6 @@ class CDSSConsultRequestDetailView(APIView):
             raise NotFoundError("CDSS support request not found.")
         return Response(CDSSConsultRequestSerializer(consult_request, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Recommendation detail
-# ---------------------------------------------------------------------------
-
 class CDSSRecommendationDetailView(APIView):
     permission_classes = [IsAuthenticated, IsClinicalStaff | IsPharmacist | IsAdmin]
 
@@ -211,11 +188,6 @@ class CDSSRecommendationDetailView(APIView):
         if request.user.role != "admin" and rec.target_roles and request.user.role not in rec.target_roles:
             raise NotFoundError("Recommendation not found.")
         return Response(CDSSRecommendationSerializer(rec, context={"request": request}).data)
-
-
-# ---------------------------------------------------------------------------
-# Unified respond endpoint  (spec: POST /recommendations/:id/respond)
-# ---------------------------------------------------------------------------
 
 TERMINAL_STATUSES = {
     CDSSStatus.ACKNOWLEDGED,
@@ -231,7 +203,6 @@ ACTION_TO_STATUS = {
     CDSSResponseAction.DISMISS: CDSSStatus.DISMISSED,
     CDSSResponseAction.FOLLOW: CDSSStatus.FOLLOWED,
 }
-
 
 class CDSSRespondView(APIView):
     """
@@ -256,11 +227,15 @@ class CDSSRespondView(APIView):
         if action not in valid_actions:
             raise ValidationAppError(f"Invalid action. Choose from: {valid_actions}")
 
-        reason = request.data.get("reason", "")
-        reason_category = request.data.get("reasonCategory", "")
-        notes = request.data.get("clinicalJustification", "")
+        reason = str(request.data.get("reason", "")).strip()
+        reason_category = str(request.data.get("reasonCategory", "")).strip()
+        notes = str(request.data.get("clinicalJustification", "")).strip()
 
-        # Override requires a reason
+        if len(reason) > 1000:
+            raise ValidationAppError("reason must not exceed 1000 characters.")
+        if len(notes) > 2000:
+            raise ValidationAppError("clinicalJustification must not exceed 2000 characters.")
+
         if action == CDSSResponseAction.OVERRIDE and not reason:
             raise ValidationAppError("reason is required for override.")
 
@@ -293,11 +268,6 @@ class CDSSRespondView(APIView):
             "overrideRecord": CDSSOverrideRecordSerializer(override, context={"request": request}).data,
         })
 
-
-# ---------------------------------------------------------------------------
-# Expire endpoint  (was missing)
-# ---------------------------------------------------------------------------
-
 class CDSSExpireView(APIView):
     """PUT /cdss/recommendations/:id/expire — mark a recommendation as expired."""
     permission_classes = [IsAuthenticated, IsAdmin | IsClinicalStaff]
@@ -314,11 +284,6 @@ class CDSSExpireView(APIView):
         )
         return Response(CDSSRecommendationSerializer(rec, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Feedback
-# ---------------------------------------------------------------------------
-
 class CDSSFeedbackView(APIView):
     permission_classes = [IsAuthenticated, IsClinicalStaff | IsPharmacist | IsAdmin]
 
@@ -327,7 +292,7 @@ class CDSSFeedbackView(APIView):
         if request.user.role != "admin" and rec.target_roles and request.user.role not in rec.target_roles:
             raise NotFoundError("Recommendation not found.")
         rating = request.data.get("feedbackRating")
-        comment = request.data.get("feedbackComment", "")
+        comment = str(request.data.get("feedbackComment", "")).strip()
         if rating is None:
             raise ValidationAppError("feedbackRating (1-5) is required.")
         try:
@@ -336,31 +301,23 @@ class CDSSFeedbackView(APIView):
                 raise ValueError
         except (ValueError, TypeError):
             raise ValidationAppError("feedbackRating must be an integer between 1 and 5.")
+        if len(comment) > 1000:
+            raise ValidationAppError("feedbackComment must not exceed 1000 characters.")
         rec.feedback_rating = rating
         rec.feedback_comment = comment
         rec.save(update_fields=["feedback_rating", "feedback_comment"])
         return Response(CDSSRecommendationSerializer(rec, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Override history
-# ---------------------------------------------------------------------------
-
 class CDSSOverrideListView(APIView):
     permission_classes = [IsAuthenticated, IsClinicalStaff | IsPharmacist | IsAdmin]
 
     def get(self, request):
-        qs = CDSSOverrideRecord.objects.select_related("recommendation").all()
+        qs = CDSSOverrideRecord.objects.select_related("recommendation__patient").all()
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs.order_by("-recorded_at"), request)
         return paginator.get_paginated_response(
             CDSSOverrideRecordSerializer(page, many=True, context={"request": request}).data
         )
-
-
-# ---------------------------------------------------------------------------
-# Patient alert summary (banner / alert tray)
-# ---------------------------------------------------------------------------
 
 class CDSSPatientSummaryView(APIView):
     permission_classes = [IsAuthenticated, IsClinicalStaff | IsPharmacist]
@@ -379,11 +336,6 @@ class CDSSPatientSummaryView(APIView):
             "info": qs.filter(severity=CDSSSeverity.INFO).count(),
             "data": CDSSRecommendationSerializer(qs[:10], many=True, context={"request": request}).data,
         })
-
-
-# ---------------------------------------------------------------------------
-# Stats  (was missing entirely)
-# ---------------------------------------------------------------------------
 
 class CDSSStatsView(APIView):
     """GET /cdss/stats — aggregate recommendation metrics."""
@@ -456,10 +408,6 @@ class CDSSStatsView(APIView):
             "consultRequestsAnswered": consult_requests.filter(status=CDSSConsultRequestStatus.ANSWERED).count(),
         })
 
-# ---------------------------------------------------------------------------
-# Knowledge Graph and GraphRAG External Integrations
-# ---------------------------------------------------------------------------
-
 from apps.cdss.services.graph_service import GraphService
 from apps.cdss.services.ai_service import AIService
 from apps.cdss.services.rule_engine_service import GraphRuleEngineService
@@ -475,7 +423,6 @@ class HospitalKnowledgeGraphView(APIView):
         graph_data = GraphService.get_hospital_graph_for_visualization()
         return Response(graph_data)
 
-
 class HospitalCDSSKnowledgeSummaryView(APIView):
     """
     GET /cdss/graph/hospital/summary
@@ -486,7 +433,6 @@ class HospitalCDSSKnowledgeSummaryView(APIView):
     def get(self, request):
         summary = GraphService.get_hospital_cdss_summary()
         return Response(summary)
-
 
 class PatientModuleGraphSummaryView(APIView):
     """
@@ -521,8 +467,11 @@ class CDSSAIConsultView(APIView):
 
     def post(self, request, patient_pk):
         prompt_query = request.data.get("prompt")
-        if not prompt_query:
+        if not prompt_query or not str(prompt_query).strip():
             raise ValidationAppError("prompt is required.")
+        prompt_query = str(prompt_query).strip()
+        if len(prompt_query) > 2000:
+            raise ValidationAppError("prompt must not exceed 2000 characters.")
 
         role = getattr(request.user, "role", "doctor") or "doctor"
         response = AIService.generate_cdss_recommendation(str(patient_pk), prompt_query, role=role)
@@ -531,7 +480,6 @@ class CDSSAIConsultView(APIView):
             "query": prompt_query,
             "response": response,
         }, status=status.HTTP_200_OK)
-
 
 class CDSSRuleRefreshView(APIView):
     """
@@ -554,7 +502,6 @@ class CDSSRuleRefreshView(APIView):
             "recommendations": serialized,
         }, status=status.HTTP_200_OK)
 
-
 class CDSSPatientReportView(APIView):
     """
     POST /cdss/patients/:id/report/
@@ -567,7 +514,6 @@ class CDSSPatientReportView(APIView):
         role = getattr(request.user, "role", "doctor") or "doctor"
         report = AIService.generate_patient_report(str(patient_pk), role=role)
         return Response({"report": report, "role": role}, status=status.HTTP_200_OK)
-
 
 class CDSSChatView(APIView):
     """
@@ -583,10 +529,13 @@ class CDSSChatView(APIView):
         user_message = request.data.get("message", "").strip()
         if not user_message:
             raise ValidationAppError("message is required.")
+        if len(user_message) > 2000:
+            raise ValidationAppError("message must not exceed 2000 characters.")
 
         history = request.data.get("history", [])
         if not isinstance(history, list):
             history = []
+        history = history[-20:]
 
         role = getattr(request.user, "role", "doctor") or "doctor"
 
@@ -601,6 +550,39 @@ class CDSSChatView(APIView):
             status=status.HTTP_200_OK,
         )
 
+class CDSSChatStreamView(APIView):
+    """
+    POST /cdss/patients/:id/chat/stream/
+    Same as CDSSChatView but streams the response token-by-token as SSE.
+    The client receives events: thinking | answer | done | error
+    """
+    permission_classes = [IsAuthenticated, IsClinicalStaff | IsPharmacist | IsAdmin]
+
+    def post(self, request, patient_pk):
+        from django.http import StreamingHttpResponse
+
+        user_message = request.data.get("message", "").strip()
+        if not user_message:
+            raise ValidationAppError("message is required.")
+        if len(user_message) > 2000:
+            raise ValidationAppError("message must not exceed 2000 characters.")
+
+        history = request.data.get("history", [])
+        if not isinstance(history, list):
+            history = []
+        history = history[-20:]
+
+        role = getattr(request.user, "role", "doctor") or "doctor"
+
+        def event_stream():
+            yield from AIService.chat_stream_with_context(
+                str(patient_pk), user_message, history, role=role
+            )
+
+        response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
+        return response
 
 class CDSSEncounterSuggestView(APIView):
     """
@@ -634,8 +616,6 @@ class CDSSEncounterSuggestView(APIView):
         except Encounter.DoesNotExist:
             raise NotFoundError("Encounter not found.")
 
-        # Use body data if provided (in-progress note not yet saved),
-        # otherwise fall back to the saved encounter fields.
         subjective = request.data.get("subjective", encounter.subjective or "")
         objective = request.data.get("objective", encounter.objective or "")
         existing_assessment = request.data.get("assessment", encounter.assessment or "")
@@ -662,8 +642,6 @@ class CDSSEncounterSuggestView(APIView):
         )
 
         return Response(result, status=status.HTTP_200_OK)
-
-
 
 class PharmacyRxAISuggestView(APIView):
     """
@@ -695,7 +673,6 @@ class PharmacyRxAISuggestView(APIView):
         )
         return Response(result, status=status.HTTP_200_OK)
 
-
 class LabResultAISuggestView(APIView):
     """
     POST /cdss/lab-panels/:panel_id/ai_suggest/
@@ -721,10 +698,144 @@ class LabResultAISuggestView(APIView):
         )
         return Response(result, status=status.HTTP_200_OK)
 
+class RadiologyAppropriatenessView(APIView):
+    """
+    POST /cdss/imaging-orders/:order_id/appropriateness/
 
-# ---------------------------------------------------------------------------
-# Accept AI Diagnosis — creates a Diagnosis record + syncs to ontology catalog
-# ---------------------------------------------------------------------------
+    Checks whether the ordered imaging study is appropriate for the clinical
+    indication using MedGemma + the patient KG (ACR Appropriateness Criteria
+    style). If flagged inappropriate, a CDSS APPROPRIATENESS_CHECK alert is
+    auto-created and pushed via WebSocket.
+    """
+    permission_classes = [IsAuthenticated, IsClinicalStaff | IsRadiologist | IsAdmin]
+
+    def post(self, request, order_pk):
+        from apps.radiology.models import ImagingOrder
+
+        try:
+            order = ImagingOrder.objects.select_related("patient").get(id=order_pk)
+        except ImagingOrder.DoesNotExist:
+            raise NotFoundError("Imaging order not found.")
+
+        indication = (order.indication or "").strip()
+        clinical_history = (order.clinical_history or "").strip()
+        if not indication and not clinical_history:
+            raise ValidationAppError(
+                "The imaging order has no indication or clinical history. "
+                "Add clinical context to the order before requesting an appropriateness check."
+            )
+
+        result = AIService.suggest_imaging_appropriateness(
+            patient_uuid=str(order.patient_id),
+            modality=order.modality or "",
+            body_part=order.body_part or "",
+            indication=indication,
+            clinical_history=clinical_history,
+        )
+
+        if result["appropriate"] is False:
+            try:
+                rec = CDSSRecommendation.objects.create(
+                    patient_id=order.patient_id,
+                    source_module=CDSSSourceModule.RADIOLOGY,
+                    triggered_by="imaging_appropriateness_check",
+                    type=CDSSRecommendationType.APPROPRIATENESS_CHECK,
+                    title=f"Imaging Appropriateness Concern: {order.modality} {order.body_part}",
+                    summary=(result["verdict_text"] or result["raw"])[:500],
+                    explanation={
+                        "orderId": str(order.id),
+                        "modality": order.modality,
+                        "bodyPart": order.body_part,
+                        "indication": indication,
+                        "reasoning": result["reasoning"],
+                        "alternatives": result["alternatives"],
+                    },
+                    severity="warning",
+                    target_roles=["doctor", "radiologist"],
+                )
+                from core.websockets import emit_cdss_new_recommendation
+                emit_cdss_new_recommendation({
+                    "id": str(rec.id),
+                    "patientId": str(order.patient_id),
+                    "type": CDSSRecommendationType.APPROPRIATENESS_CHECK,
+                    "severity": "warning",
+                    "title": rec.title,
+                    "summary": rec.summary,
+                    "targetRoles": rec.target_roles,
+                }, target_roles=rec.target_roles)
+            except Exception:
+                pass
+
+        write_audit_log(
+            request, AuditAction.READ, "RadiologyAppropriateness", str(order.id),
+            details={"patientId": str(order.patient_id), "modality": order.modality},
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+class RadiologyReportAIAssistView(APIView):
+    """
+    POST /cdss/radiology-reports/:report_id/ai_assist/
+
+    AI-assisted radiology report writing. The radiologist provides their
+    findings text; MedGemma drafts a structured impression and follow-up
+    recommendations cross-referenced with the patient KG.
+
+    Body (optional — falls back to saved report fields if omitted):
+      { "findings": "...", "technique": "..." }
+
+    Returns:
+      { "impression": str, "recommendations": str, "alerts": str, "raw": str }
+    """
+    permission_classes = [IsAuthenticated, IsRadiologist | IsAdmin]
+
+    def post(self, request, report_pk):
+        from apps.radiology.models import RadiologyReport
+
+        try:
+            report = RadiologyReport.objects.select_related(
+                "study__order", "patient"
+            ).get(id=report_pk)
+        except RadiologyReport.DoesNotExist:
+            raise NotFoundError("Radiology report not found.")
+
+        findings = (request.data.get("findings") or report.findings or "").strip()
+        technique = (request.data.get("technique") or report.technique or "").strip()
+
+        if not findings:
+            raise ValidationAppError(
+                "findings are required to generate AI report suggestions. "
+                "Enter your findings before requesting AI assistance."
+            )
+        if len(findings) > 5000:
+            raise ValidationAppError("findings must not exceed 5000 characters.")
+
+        order = (
+            report.study.order
+            if report.study_id and report.study.order_id
+            else None
+        )
+        modality = order.modality if order else ""
+        body_part = order.body_part if order else ""
+        indication = (
+            (order.indication or report.indication or "").strip()
+            if order
+            else (report.indication or "").strip()
+        )
+
+        result = AIService.suggest_radiology_report(
+            patient_uuid=str(report.patient_id),
+            modality=modality,
+            body_part=body_part,
+            indication=indication,
+            technique=technique,
+            findings=findings,
+        )
+
+        write_audit_log(
+            request, AuditAction.READ, "RadiologyReportAIAssist", str(report_pk),
+            details={"patientId": str(report.patient_id), "modality": modality},
+        )
+        return Response(result, status=status.HTTP_200_OK)
 
 class CDSSAcceptAIDiagnosisView(APIView):
     """
@@ -761,7 +872,6 @@ class CDSSAcceptAIDiagnosisView(APIView):
         if not diagnosis_text:
             raise ValidationAppError("diagnosis is required.")
 
-        # ── Resolve ICD-10 code ────────────────────────────────────────────
         raw_code = (request.data.get("icd10Code") or "").strip().upper()
         resolved_code = None
         resolved_description = diagnosis_text
@@ -773,7 +883,6 @@ class CDSSAcceptAIDiagnosisView(APIView):
                 resolved_code = raw_code
                 resolved_description = icd.get_description(raw_code) or diagnosis_text
             else:
-                # Fuzzy search by diagnosis name (cap at 10k codes)
                 search_term = diagnosis_text.lower()
                 for code in icd.get_all_codes()[:10000]:
                     desc = icd.get_description(code) or ""
@@ -785,9 +894,8 @@ class CDSSAcceptAIDiagnosisView(APIView):
             pass
 
         if not resolved_code:
-            resolved_code = "R69"  # Illness, unspecified
+            resolved_code = "R69"
 
-        # ── Create Diagnosis record ────────────────────────────────────────
         diagnosis = Diagnosis.objects.create(
             patient=encounter.patient,
             encounter=encounter,
@@ -799,10 +907,6 @@ class CDSSAcceptAIDiagnosisView(APIView):
             snomed_code=request.data.get("snomedCode") or "",
             snomed_display=request.data.get("snomedDisplay") or "",
         )
-        # post_save signal fires automatically:
-        # sync_diagnosis_to_graph → GraphSyncService.sync_diagnosis
-        # → OntologyService.sync_diagnosis_ontology
-        # → MedicalOntologyConcept + MedicalOntologyMapping created in catalog
 
         write_audit_log(
             request, AuditAction.CREATE, "AIDiagnosisAccepted", str(diagnosis.id),

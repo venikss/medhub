@@ -6,7 +6,6 @@ from apps.cdss.models import (
     OntologyDomain,
 )
 
-
 class OntologyService:
     @staticmethod
     def ensure_concept(*, code_system: str, code: str, display: str, domain: str, metadata=None):

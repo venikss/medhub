@@ -68,7 +68,6 @@ function ReportRenderer({ text }: { text: string }) {
         if (line.trim() === "") {
           return <div key={i} className="h-1" />;
         }
-        // Bold **text**
         const parts = line.split(/(\*\*[^*]+\*\*)/g);
         return (
           <p key={i} className="text-slate-300">

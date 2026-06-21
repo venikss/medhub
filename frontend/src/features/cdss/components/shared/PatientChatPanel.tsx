@@ -11,6 +11,8 @@ import { useAuthStore } from "@/features/auth/stores/auth-store";
 interface PatientChatPanelProps {
   patientId: string;
   patientName?: string;
+  /** Pre-seeded message that is auto-sent when the panel first mounts. */
+  initialMessage?: string;
   className?: string;
 }
 
@@ -80,6 +82,7 @@ function MessageContent({ text }: { text: string }) {
 export function PatientChatPanel({
   patientId,
   patientName,
+  initialMessage,
   className,
 }: PatientChatPanelProps) {
   const token = useAuthStore((state) => state.token);
@@ -89,26 +92,43 @@ export function PatientChatPanel({
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const sentInitialRef = useRef(false);
+  const loadingRef = useRef(false);
 
-  // Auto-scroll to the latest message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history, loading]);
 
+  useEffect(() => {
+    if (initialMessage && !sentInitialRef.current) {
+      sentInitialRef.current = true;
+      void handleSend(initialMessage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleSend(messageOverride?: string) {
     const message = (messageOverride ?? input).trim();
-    if (!message || loading) return;
+    if (!message || loadingRef.current) return;
 
+    loadingRef.current = true;
     setInput("");
     setError(null);
     setLoading(true);
 
+    const historySnapshot = history;
+
+    const userTurn: ChatMessage = { role: "user", content: message };
+    setHistory((prev) => [...prev, userTurn]);
+
     try {
-      const result = await chatWithPatient(patientId, message, history, token);
+      const result = await chatWithPatient(patientId, message, historySnapshot, token);
       setHistory(result.history);
     } catch (err) {
+      setHistory(historySnapshot);
       setError(err instanceof Error ? err.message : "Failed to get a response.");
     } finally {
+      loadingRef.current = false;
       setLoading(false);
       inputRef.current?.focus();
     }

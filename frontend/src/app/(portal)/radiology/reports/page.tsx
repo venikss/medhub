@@ -200,6 +200,7 @@ function ReportsContent() {
             <ReportEditor
               report={selected}
               priorStudies={visiblePriors}
+              studyId={selected.studyId ?? undefined}
               onSaveDraft={handleSaveDraft}
               onSignPreliminary={handleSignPreliminary}
               onSign={handleSign}

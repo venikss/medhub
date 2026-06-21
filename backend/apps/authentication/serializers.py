@@ -9,7 +9,6 @@ from django.contrib.auth import authenticate
 
 from .models import User, UserRole
 
-
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Adds role and departmentId to JWT payload."""
 
@@ -20,7 +19,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         user = self.user
         refresh = RefreshToken.for_user(user)
 
-        # Inject custom claims
         refresh["role"] = user.role
         if user.department_id:
             refresh["departmentId"] = str(user.department_id)
@@ -28,7 +26,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data["token"] = str(refresh.access_token)
         data["refreshToken"] = str(refresh)
         data["user"] = UserProfileSerializer(user).data
-        # Remove default keys
         data.pop("access", None)
         data.pop("refresh", None)
         return data
@@ -42,12 +39,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             token["departmentId"] = str(user.department_id)
         return token
 
-
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
     role = serializers.ChoiceField(choices=UserRole.choices, required=False)
-
 
 class RefreshTokenSerializer(serializers.Serializer):
     refreshToken = serializers.CharField(required=False)
@@ -60,26 +55,31 @@ class RefreshTokenSerializer(serializers.Serializer):
         attrs["refreshToken"] = token
         return attrs
 
-
 class ChangePasswordSerializer(serializers.Serializer):
     currentPassword = serializers.CharField(write_only=True)
     newPassword = serializers.CharField(write_only=True, min_length=8)
 
+    def validate_newPassword(self, value):
+        import re
+        if not re.search(r'[A-Z]', value):
+            raise serializers.ValidationError("Password must contain at least one uppercase letter.")
+        if not re.search(r'[0-9]', value):
+            raise serializers.ValidationError("Password must contain at least one digit.")
+        if not re.search(r'[^A-Za-z0-9]', value):
+            raise serializers.ValidationError("Password must contain at least one special character.")
+        return value
 
 class AuthTokenResponseSerializer(serializers.Serializer):
     token = serializers.CharField()
     refreshToken = serializers.CharField()
     user = serializers.DictField()
 
-
 class AccessTokenResponseSerializer(serializers.Serializer):
     token = serializers.CharField()
     refreshToken = serializers.CharField()
 
-
 class MessageResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
-
 
 class UserProfileSerializer(serializers.ModelSerializer):
     departmentId = serializers.UUIDField(source="department_id", read_only=True, allow_null=True)
@@ -122,7 +122,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         data["specialization"] = instance.specialization
         data["licenseNumber"] = instance.license_number
         data["createdAt"] = instance.created_at.isoformat()
-        # Add patient count if annotated from view
         if hasattr(instance, "active_patient_count"):
             data["activePatientCount"] = instance.active_patient_count
         return data

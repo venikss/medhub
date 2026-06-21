@@ -47,7 +47,6 @@ export default function PharmacyDashboard() {
         listPharmacyInterventions({ pendingOnly: true }, token ?? undefined),
       ]);
       setDashboard(data);
-      // Only keep genuinely pending items — exclude verified/cancelled/rejected
       const PENDING_STATUSES = new Set(["ordered", "pending-verification"]);
       setPendingVerification(verificationQueue.filter(rx => PENDING_STATUSES.has(rx.status)));
       setPendingInterventions(interventionQueue);
@@ -73,7 +72,6 @@ export default function PharmacyDashboard() {
 
   const stats = dashboard?.stats;
 
-  // Only show severe warnings when there are still unverified prescriptions
   const severeWarnings = useMemo(() => {
     const all = dashboard?.severeWarnings ?? [];
     if (pendingVerification.length === 0) return [];

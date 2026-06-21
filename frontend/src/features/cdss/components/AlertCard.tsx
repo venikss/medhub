@@ -36,7 +36,6 @@ const SEVERITY_CONFIG: Record<CDSSAlertSeverity, {
 };
 
 const TYPE_LABELS: Record<CDSSRecommendationType, string> = {
-  // Original 8
   drug_interaction:      "Drug Interaction",
   allergy:               "Allergy Alert",
   dosage_warning:        "Dosage Warning",
@@ -45,7 +44,6 @@ const TYPE_LABELS: Record<CDSSRecommendationType, string> = {
   preventive:            "Preventive Care",
   order_set:             "Order Set",
   abnormal_result:       "Abnormal Result",
-  // New types
   duplicate_therapy:     "Duplicate Therapy",
   contraindication:      "Contraindication",
   appropriateness_check: "Appropriateness Check",

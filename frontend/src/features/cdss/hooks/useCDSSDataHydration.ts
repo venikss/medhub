@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { listCDSSOverrides, listCDSSRecommendations, runPatientCDSSRules } from "../api";
-import { mockCDSSOverrides, mockCDSSRecommendations } from "../mock/data";
 import { useCDSSStore } from "../store";
 
 interface UseCDSSDataHydrationOptions {
@@ -11,7 +10,6 @@ interface UseCDSSDataHydrationOptions {
   refreshPatientIds?: string[];
   refreshBeforeLoad?: boolean;
   includeOverrides?: boolean;
-  useMockOnError?: boolean;
 }
 
 export function useCDSSDataHydration({
@@ -20,7 +18,6 @@ export function useCDSSDataHydration({
   refreshPatientIds = [],
   refreshBeforeLoad = false,
   includeOverrides = false,
-  useMockOnError = false,
 }: UseCDSSDataHydrationOptions) {
   const setRecommendations = useCDSSStore((state) => state.setRecommendations);
   const setOverrides = useCDSSStore((state) => state.setOverrides);
@@ -68,27 +65,11 @@ export function useCDSSDataHydration({
       } catch (err) {
         if (cancelled) return;
 
-        if (useMockOnError) {
-          const recommendations = patientId
-            ? mockCDSSRecommendations.filter((item) => item.patientId === patientId)
-            : mockCDSSRecommendations;
-          const overrides = patientId
-            ? mockCDSSOverrides.filter((item) => item.patientId === patientId)
-            : mockCDSSOverrides;
-
-          setRecommendations(recommendations);
-          if (includeOverrides) {
-            setOverrides(overrides);
-          }
-          setError("Showing seeded CDSS examples while the live feed is unavailable.");
-        } else {
-          setRecommendations([]);
-          if (includeOverrides) {
-            setOverrides([]);
-          }
-          setError(err instanceof Error ? err.message : "Failed to load CDSS recommendations.");
+        setRecommendations([]);
+        if (includeOverrides) {
+          setOverrides([]);
         }
-
+        setError(err instanceof Error ? err.message : "Failed to load CDSS recommendations.");
         setLoading(false);
       }
     }
@@ -107,7 +88,6 @@ export function useCDSSDataHydration({
     setOverrides,
     setRecommendations,
     token,
-    useMockOnError,
   ]);
 
   return { loading, error };

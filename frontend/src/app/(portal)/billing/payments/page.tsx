@@ -132,7 +132,6 @@ export default function PaymentsPage() {
                     setPayments((current) => [payment, ...current].sort((a, b) => b.postedAt.localeCompare(a.postedAt)));
                   })
                   .catch(() => {
-                    // Keep the current layout stable if posting fails.
                   });
               }}
             />

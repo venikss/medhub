@@ -42,7 +42,6 @@ export default function BedsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // Dialog form state
   interface BedForm { wardId: string; number: string; roomNumber: string; bedType: string; status: BedStatus }
   const EMPTY_BED: BedForm = { wardId: "", number: "", roomNumber: "", bedType: "general", status: "available" };
   const [formOpen, setFormOpen] = useState(false);
@@ -50,7 +49,6 @@ export default function BedsPage() {
   const [bedForm, setBedForm] = useState<BedForm>(EMPTY_BED);
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
-  // Status change dialog
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusBed, setStatusBed] = useState<Bed | null>(null);
   const [newStatus, setNewStatus] = useState<BedStatus>("available");

@@ -8,7 +8,6 @@ from django.conf import settings
 from core.models import TimeStampedModel
 from core.utils import generate_accession_number
 
-
 class ImagingModality(models.TextChoices):
     XR = "XR", "X-Ray"
     CT = "CT", "CT Scan"
@@ -19,7 +18,6 @@ class ImagingModality(models.TextChoices):
     DEXA = "DEXA", "DEXA"
     FLUORO = "FLUORO", "Fluoroscopy"
     MAMMO = "MAMMO", "Mammography"
-
 
 class ImagingStudyStatus(models.TextChoices):
     ORDERED = "ordered", "Ordered"
@@ -32,7 +30,6 @@ class ImagingStudyStatus(models.TextChoices):
     REPORTED = "reported", "Reported"
     SIGNED = "signed", "Signed"
     CANCELLED = "cancelled", "Cancelled"
-
 
 class ImagingOrder(TimeStampedModel):
     doctor_order = models.OneToOneField(
@@ -97,7 +94,6 @@ class ImagingOrder(TimeStampedModel):
             self.accession_number = accession
         super().save(*args, **kwargs)
 
-
 class ImagingStudy(TimeStampedModel):
     order = models.OneToOneField(ImagingOrder, on_delete=models.CASCADE, related_name="study")
     patient = models.ForeignKey(
@@ -122,14 +118,12 @@ class ImagingStudy(TimeStampedModel):
         exam = self.order.exam_name if self.order_id and self.order.exam_name else "Imaging Study"
         return f"{exam} - {self.patient.full_name}"
 
-
 class RadReportStatus(models.TextChoices):
     DRAFT = "draft", "Draft"
     PRELIMINARY = "preliminary", "Preliminary"
     FINAL = "final", "Final"
     ADDENDUM = "addendum", "Addendum"
     VOID = "void", "Void"
-
 
 class RadiologyReport(TimeStampedModel):
     study = models.OneToOneField(ImagingStudy, on_delete=models.CASCADE, related_name="report")
@@ -163,12 +157,52 @@ class RadiologyReport(TimeStampedModel):
         exam = self.study.order.exam_name if self.study_id and self.study.order_id and self.study.order.exam_name else "Radiology Report"
         return f"{exam} - {self.patient.full_name}"
 
+class DicomSeries(TimeStampedModel):
+    """
+    One upload session = one series.
+    A patient's 60-slice CT is one DicomSeries with 60 DicomFile children.
+    Multiple scans of the same study are separate DicomSeries rows (series_number 1, 2, …).
+    """
+    study = models.ForeignKey(ImagingStudy, on_delete=models.CASCADE, related_name="dicom_series")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="uploaded_dicom_series",
+    )
+    series_number = models.PositiveIntegerField(default=1)
+    series_uid = models.CharField(max_length=128, blank=True, null=True)
+    description = models.CharField(max_length=200, blank=True, null=True)
+    modality = models.CharField(max_length=10, blank=True, null=True)
+    body_part = models.CharField(max_length=100, blank=True, null=True)
+    slice_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "dicom_series"
+        ordering = ["-created_at"]
+        unique_together = [("study", "series_number")]
+
+    def __str__(self):
+        label = self.description or self.modality or "Unknown"
+        return f"Series {self.series_number} — {label} ({self.slice_count} slices)"
+
+class DicomFile(TimeStampedModel):
+    """One row per .dcm file belonging to a DicomSeries."""
+    series = models.ForeignKey(DicomSeries, on_delete=models.CASCADE, related_name="files")
+    file_url = models.URLField(max_length=1000)
+    file_name = models.CharField(max_length=255)
+    file_size = models.PositiveIntegerField(null=True, blank=True)
+    instance_number = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "dicom_files"
+        ordering = ["instance_number", "created_at"]
+
+    def __str__(self):
+        return self.file_name
 
 class RadCriticalFindingStatus(models.TextChoices):
     IDENTIFIED = "identified", "Identified"
     NOTIFIED = "notified", "Notified"
     ACKNOWLEDGED = "acknowledged", "Acknowledged"
-
 
 class RadCriticalFinding(TimeStampedModel):
     study = models.ForeignKey(ImagingStudy, on_delete=models.CASCADE, related_name="critical_findings")
@@ -200,12 +234,10 @@ class RadCriticalFinding(TimeStampedModel):
     def __str__(self):
         return f"Critical finding - {self.patient.full_name}"
 
-
 class ModalitySlotStatus(models.TextChoices):
     AVAILABLE = "available", "Available"
     BOOKED = "booked", "Booked"
     BLOCKED = "blocked", "Blocked"
-
 
 class ModalitySchedule(TimeStampedModel):
     modality = models.CharField(max_length=10, choices=ImagingModality.choices)

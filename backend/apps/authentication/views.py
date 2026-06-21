@@ -23,7 +23,6 @@ from .serializers import (
 )
 from .services import AuthService
 
-
 class LoginView(APIView):
     permission_classes = [AllowAny]
     serializer_class = LoginSerializer
@@ -52,7 +51,6 @@ class LoginView(APIView):
             status=status.HTTP_200_OK,
         )
 
-
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
     serializer_class = RefreshTokenSerializer
@@ -63,7 +61,6 @@ class LogoutView(APIView):
         AuthService.logout(serializer.validated_data["refreshToken"])
         write_audit_log(request=request, action=AuditAction.LOGOUT, resource="auth")
         return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 class RefreshView(APIView):
     permission_classes = [AllowAny]
@@ -76,14 +73,12 @@ class RefreshView(APIView):
         data = AuthService.refresh(serializer.validated_data["refreshToken"])
         return Response(data, status=status.HTTP_200_OK)
 
-
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
     serializer_class = UserProfileSerializer
 
     def get(self, request):
         return Response(UserProfileSerializer(request.user).data)
-
 
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]

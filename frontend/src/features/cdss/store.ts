@@ -12,33 +12,27 @@ import type {
 } from "@/types";
 
 interface CDSSState {
-  // Data
   recommendations: CDSSRecommendation[];
   overrides: CDSSOverrideRecord[];
 
-  // Filters (Alert Center)
   severityFilter: CDSSAlertSeverity | "all";
   typeFilter: CDSSRecommendationType | "all";
   statusFilter: CDSSAlertStatus | "all";
   moduleFilter: CDSSSourceModule | "all";
   patientSearch: string;
 
-  // Detail / selection
   selectedRecommendationId: string | null;
   showExplanationPanel: boolean;
   showEvidenceViewer: boolean;
 
-  // Override modal
   showOverrideModal: boolean;
   overrideTargetId: string | null;
 
-  // Filters (History)
   historyActionFilter: CDSSOverrideAction | "all";
   historyDateFrom: string;
   historyDateTo: string;
   historyClinicianSearch: string;
 
-  // Actions
   setSeverityFilter: (v: CDSSAlertSeverity | "all") => void;
   setTypeFilter: (v: CDSSRecommendationType | "all") => void;
   setStatusFilter: (v: CDSSAlertStatus | "all") => void;
@@ -80,7 +74,7 @@ export const useCDSSStore = create<CDSSState>((set, get) => ({
 
   severityFilter: "all",
   typeFilter: "all",
-  statusFilter: "all",
+  statusFilter: "active",
   moduleFilter: "all",
   patientSearch: "",
 
@@ -133,14 +127,18 @@ export const useCDSSStore = create<CDSSState>((set, get) => ({
       payload.token,
     );
 
-    set({
-      recommendations: recommendations.map((item) =>
+    set((prev) => ({
+      recommendations: prev.recommendations.map((item) =>
         item.id === targetId ? response.recommendation : item
       ),
-      overrides: [response.overrideRecord, ...overrides],
+      overrides: [response.overrideRecord, ...prev.overrides],
       showOverrideModal: false,
       overrideTargetId: null,
-    });
+      selectedRecommendationId:
+        prev.selectedRecommendationId === targetId
+          ? null
+          : prev.selectedRecommendationId,
+    }));
   },
 
   submitFeedback: (id, rating, comment) => {

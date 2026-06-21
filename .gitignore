@@ -1,3 +1,36 @@
-.env 
-venv/ 
-__pycache__/ 
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+
+# Django artifacts
+*.log
+db.sqlite3
+staticfiles/
+media/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+*.swp
+

@@ -63,11 +63,11 @@ export function PatientBanner({ patient, className }: PatientBannerProps) {
 
                 {/* Allergies — always visible */}
                 <div className="shrink-0">
-                    {patient.allergies && patient.allergies.length > 0 ? (
+                    {(() => { const al = Array.isArray(patient.allergies) ? patient.allergies : typeof patient.allergies === "string" && patient.allergies ? patient.allergies.split(",").map((s: string) => s.trim()).filter(Boolean) : []; return al.length > 0 ? (
                         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/25">
                             <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
                             <div className="flex flex-wrap gap-1">
-                                {patient.allergies.map((a: any, i: number) => (
+                                {al.map((a: any, i: number) => (
                                     <Badge key={i} variant="destructive" className="text-[10px] px-1.5 py-0">
                                         {typeof a === "string" ? a : (a.substance ?? a.reaction ?? String(a))}
                                     </Badge>
@@ -78,7 +78,7 @@ export function PatientBanner({ patient, className }: PatientBannerProps) {
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                             <Shield className="h-3 w-3" /> NKDA
                         </span>
-                    )}
+                    ); })()}
                 </div>
             </div>
         </div>

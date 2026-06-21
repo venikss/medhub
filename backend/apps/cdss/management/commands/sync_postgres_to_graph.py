@@ -7,7 +7,6 @@ from apps.laboratory.models import LabTestResult
 from apps.patients.models import Patient
 from apps.radiology.models import RadiologyReport
 
-
 class Command(BaseCommand):
     help = "Sync historical PostgreSQL data into the Neo4j Knowledge Graph"
 

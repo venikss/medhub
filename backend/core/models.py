@@ -7,7 +7,6 @@ import uuid
 from django.db import models
 from django.utils import timezone
 
-
 class TimeStampedModel(models.Model):
     """Abstract base providing UUID PK and ISO 8601 UTC timestamps."""
 
@@ -17,7 +16,6 @@ class TimeStampedModel(models.Model):
 
     class Meta:
         abstract = True
-
 
 class SoftDeleteModel(TimeStampedModel):
     """Extends TimeStampedModel with soft-delete capability."""
@@ -39,13 +37,11 @@ class SoftDeleteModel(TimeStampedModel):
     def is_deleted(self):
         return self.deleted_at is not None
 
-
 class SoftDeleteManager(models.Manager):
     """Returns only non-deleted records by default."""
 
     def get_queryset(self):
         return super().get_queryset().filter(deleted_at__isnull=True)
-
 
 class AllObjectsManager(models.Manager):
     """Returns all records including soft-deleted."""

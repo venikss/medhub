@@ -256,6 +256,17 @@ export function holdPharmacyPrescription(
   });
 }
 
+export function releasePharmacyPrescriptionHold(
+  prescriptionId: string,
+  token?: string,
+) {
+  return apiFetch<PharmacyPrescription>(`/pharmacy/prescriptions/${prescriptionId}/hold/`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({}),
+  });
+}
+
 export function rejectPharmacyPrescription(
   prescriptionId: string,
   reason: string,

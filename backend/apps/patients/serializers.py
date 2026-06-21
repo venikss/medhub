@@ -7,7 +7,6 @@ import re
 from rest_framework import serializers
 from .models import Patient, Admission, AdmissionTransfer, Queue, Appointment, Consent
 
-
 ALLOWED_MARITAL_STATUSES = {"single", "married", "divorced", "widowed"}
 PHONE_RE = re.compile(r"^[0-9+\-\s()]{7,20}$")
 
@@ -23,7 +22,6 @@ ADMISSION_STATUS_FROM_API = {
     "discharged": "discharged",
     "pending": "active",
 }
-
 
 class PatientSerializer(serializers.ModelSerializer):
     firstName = serializers.CharField(source="first_name")
@@ -197,7 +195,6 @@ class PatientSerializer(serializers.ModelSerializer):
             "createdAt": instance.created_at.isoformat() if hasattr(instance.created_at, "isoformat") else instance.created_at,
         }
 
-
 class AdmissionSerializer(serializers.ModelSerializer):
     patientId = serializers.UUIDField(source="patient_id")
     admittingDoctor = serializers.UUIDField(source="admitting_doctor_id", required=False, allow_null=True)
@@ -280,7 +277,6 @@ class AdmissionSerializer(serializers.ModelSerializer):
             "createdAt": instance.created_at.isoformat(),
         }
 
-
 class QueueSerializer(serializers.ModelSerializer):
     patientId = serializers.UUIDField(source="patient_id")
     ticketNumber = serializers.CharField(source="ticket_number", read_only=True)
@@ -315,7 +311,6 @@ class QueueSerializer(serializers.ModelSerializer):
             "completedAt": instance.completed_at.isoformat() if instance.completed_at else None,
             "createdAt": instance.created_at.isoformat(),
         }
-
 
 class AppointmentSerializer(serializers.ModelSerializer):
     patientId = serializers.UUIDField(source="patient_id")
@@ -357,7 +352,6 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "notes": instance.notes,
             "createdAt": instance.created_at.isoformat(),
         }
-
 
 class ConsentSerializer(serializers.ModelSerializer):
     patientId = serializers.UUIDField(source="patient_id", read_only=True)

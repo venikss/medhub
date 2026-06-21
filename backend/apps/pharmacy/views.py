@@ -50,7 +50,6 @@ from .serializers import (
     RefillSerializer, SubstitutionSerializer,
 )
 
-
 PharmacyReadWritePermission = ReadWriteRolePermission.for_roles(
     [UserRole.PHARMACIST, UserRole.DOCTOR, UserRole.ADMIN],
     [UserRole.PHARMACIST],
@@ -61,7 +60,6 @@ PharmacyDoctorResponsePermission = ReadWriteRolePermission.for_roles(
     [UserRole.PHARMACIST, UserRole.DOCTOR],
 )
 
-
 def _map_warning_severity_to_cdss(severity: str) -> str:
     mapping = {
         "contraindicated": "critical",
@@ -70,7 +68,6 @@ def _map_warning_severity_to_cdss(severity: str) -> str:
         "info": "info",
     }
     return mapping.get(severity, "warning")
-
 
 def _trigger_drug_safety_cdss(patient_id, warning):
     from apps.cdss.models import CDSSRecommendation, CDSSRecommendationType
@@ -107,11 +104,6 @@ def _trigger_drug_safety_cdss(patient_id, warning):
         "targetRoles": rec.target_roles,
     }, target_roles=rec.target_roles)
 
-
-# ---------------------------------------------------------------------------
-# Prescriptions
-# ---------------------------------------------------------------------------
-
 class PharmacyStatsView(APIView):
     permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
 
@@ -142,7 +134,6 @@ class PharmacyStatsView(APIView):
             "lowStockItems": low_stock_items,
             "pendingSubstitutions": pending_substitutions,
         })
-
 
 class PharmacyProfilesView(APIView):
     permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
@@ -184,7 +175,6 @@ class PharmacyProfilesView(APIView):
                 ).count(),
             }
         return Response({"data": list(seen.values()), "total": len(seen)})
-
 
 class PharmacyDashboardView(APIView):
     permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
@@ -250,7 +240,6 @@ class PharmacyDashboardView(APIView):
             ).data,
         })
 
-
 class PharmacyRxListView(APIView):
     permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
     serializer_class = PharmacyPrescriptionSerializer
@@ -288,7 +277,6 @@ class PharmacyRxListView(APIView):
             PharmacyPrescriptionSerializer(page, many=True, context={"request": request}).data
         )
 
-
 class PharmacyDispenseQueueView(APIView):
     permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
 
@@ -311,7 +299,6 @@ class PharmacyDispenseQueueView(APIView):
             PharmacyPrescriptionSerializer(page, many=True, context={"request": request}).data
         )
 
-
 class PharmacyRxDetailView(APIView):
     permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
     serializer_class = PharmacyPrescriptionSerializer
@@ -322,7 +309,6 @@ class PharmacyRxDetailView(APIView):
         except PharmacyPrescription.DoesNotExist:
             raise NotFoundError("Pharmacy prescription not found.")
         return Response(PharmacyPrescriptionSerializer(rx, context={"request": request}).data)
-
 
 class PharmacyRxVerifyView(APIView):
     permission_classes = [IsAuthenticated, IsPharmacist]
@@ -351,8 +337,6 @@ class PharmacyRxVerifyView(APIView):
             request, AuditAction.UPDATE, "PharmacyPrescription", str(rx.id),
             {"action": "verify"}, AuditSeverity.HIGH,
         )
-        # Auto-run KG drug safety check on verification — persists DrugWarning +
-        # CDSSRecommendation records for any KG-detected DDI / allergy / risk-group issues.
         try:
             from apps.pharmacy.cdss_service import PharmacyCDSSService
             med_name = getattr(getattr(rx, "original_prescription", None), "medication", None)
@@ -362,9 +346,8 @@ class PharmacyRxVerifyView(APIView):
                     rx.patient_id, safety, prescription=rx
                 )
         except Exception:
-            pass  # KG safety check is non-critical — never block the verify workflow
+            pass
         return Response(PharmacyPrescriptionSerializer(rx, context={"request": request}).data)
-
 
 class PharmacyRxRejectView(APIView):
     permission_classes = [IsAuthenticated, IsPharmacist]
@@ -393,12 +376,10 @@ class PharmacyRxRejectView(APIView):
         rx.status = RxStatus.CANCELLED
         rx.hold_reason = reason
         rx.save(update_fields=["status", "hold_reason"])
-        # Mirror rejection back to doctor's Prescription so doctor sees it discontinued
         original_rx = getattr(rx, "original_prescription", None)
         if original_rx:
             original_rx.status = "discontinued"
             original_rx.save(update_fields=["status"])
-        # Notify the prescribing doctor
         prescriber = getattr(getattr(rx, "original_prescription", None), "prescribed_by", None)
         medication = getattr(getattr(rx, "original_prescription", None), "medication", "") or ""
         emit_pharmacy_rx_rejected(
@@ -415,7 +396,6 @@ class PharmacyRxRejectView(APIView):
             {"action": "reject", "reason": reason}, AuditSeverity.HIGH,
         )
         return Response(PharmacyPrescriptionSerializer(rx, context={"request": request}).data)
-
 
 class PharmacyRxHoldView(APIView):
     permission_classes = [IsAuthenticated, IsPharmacist]
@@ -444,12 +424,10 @@ class PharmacyRxHoldView(APIView):
         rx.status = RxStatus.ON_HOLD
         rx.hold_reason = reason
         rx.save(update_fields=["status", "hold_reason"])
-        # Mirror hold back to doctor's Prescription so doctor sees it on-hold
         original_rx = getattr(rx, "original_prescription", None)
         if original_rx:
             original_rx.status = "on-hold"
             original_rx.save(update_fields=["status"])
-        # Notify the prescribing doctor
         prescriber = getattr(getattr(rx, "original_prescription", None), "prescribed_by", None)
         medication = getattr(getattr(rx, "original_prescription", None), "medication", "") or ""
         emit_pharmacy_rx_on_hold(
@@ -463,6 +441,28 @@ class PharmacyRxHoldView(APIView):
         )
         return Response(PharmacyPrescriptionSerializer(rx, context={"request": request}).data)
 
+    def post(self, request, pk):
+        """Release a hold — moves on-hold → pending-verification for re-review."""
+        try:
+            rx = PharmacyPrescription.objects.select_related(
+                "patient", "original_prescription__prescribed_by"
+            ).get(id=pk)
+        except PharmacyPrescription.DoesNotExist:
+            raise NotFoundError("Pharmacy prescription not found.")
+        if rx.status != RxStatus.ON_HOLD:
+            raise ConflictError("Only on-hold prescriptions can be released.")
+        rx.status = RxStatus.PENDING_VERIFICATION
+        rx.hold_reason = None
+        rx.save(update_fields=["status", "hold_reason"])
+        original_rx = getattr(rx, "original_prescription", None)
+        if original_rx:
+            original_rx.status = "active"
+            original_rx.save(update_fields=["status"])
+        write_audit_log(
+            request, AuditAction.UPDATE, "PharmacyRx", str(pk),
+            {"action": "hold_released", "patientId": str(rx.patient_id)},
+        )
+        return Response(PharmacyPrescriptionSerializer(rx, context={"request": request}).data)
 
 class PharmacyRxCancelView(APIView):
     permission_classes = [IsAuthenticated, IsPharmacist]
@@ -492,12 +492,10 @@ class PharmacyRxCancelView(APIView):
         rx.status = RxStatus.CANCELLED
         rx.hold_reason = reason
         rx.save(update_fields=["status", "hold_reason"])
-        # Mirror cancellation to doctor's Prescription
         original_rx = getattr(rx, "original_prescription", None)
         if original_rx:
             original_rx.status = "discontinued"
             original_rx.save(update_fields=["status"])
-        # Notify the prescribing doctor
         prescriber = getattr(original_rx, "prescribed_by", None)
         medication = getattr(original_rx, "medication", "") or ""
         emit_pharmacy_rx_cancelled(
@@ -515,7 +513,6 @@ class PharmacyRxCancelView(APIView):
             {"action": "cancel", "reason": reason}, AuditSeverity.HIGH,
         )
         return Response(PharmacyPrescriptionSerializer(rx, context={"request": request}).data)
-
 
 class PharmacyRxDispenseView(APIView):
     permission_classes = [IsAuthenticated, IsPharmacist]
@@ -563,7 +560,6 @@ class PharmacyRxDispenseView(APIView):
             "patientName": rx.patient.full_name,
             "dispenseId": str(dispense.id),
         })
-        # Decrement formulary stock for the dispensed drug
         med_name = getattr(getattr(rx, "original_prescription", None), "medication", None)
         if med_name and dispense.quantity:
             FormularyItem.objects.filter(
@@ -577,11 +573,6 @@ class PharmacyRxDispenseView(APIView):
             DispenseRecordSerializer(dispense, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
-
-# ---------------------------------------------------------------------------
-# Drug Safety Check
-# ---------------------------------------------------------------------------
 
 class DrugSafetyCheckView(APIView):
     permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
@@ -621,11 +612,6 @@ class DrugSafetyCheckView(APIView):
             })
         return Response({"safe": True, "warnings": []})
 
-
-# ---------------------------------------------------------------------------
-# Formulary
-# ---------------------------------------------------------------------------
-
 class FormularyListView(APIView):
     permission_classes = [IsAuthenticated, IsPharmacist | IsDoctor]
     serializer_class = FormularyItemSerializer
@@ -642,7 +628,6 @@ class FormularyListView(APIView):
         return paginator.get_paginated_response(
             FormularyItemSerializer(page, many=True, context={"request": request}).data
         )
-
 
 class FormularyDetailView(APIView):
     permission_classes = [IsAuthenticated, IsPharmacist | IsAdmin]
@@ -665,7 +650,6 @@ class FormularyDetailView(APIView):
         item.refresh_from_db()
         return Response(FormularyItemSerializer(item, context={"request": request}).data)
 
-
 class FormularyStockView(APIView):
     """GET /pharmacy/formulary/:id/stock â€” current stock level (was missing)."""
     permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
@@ -684,7 +668,6 @@ class FormularyStockView(APIView):
             "isLowStock": item.stock_level <= item.reorder_level,
         })
 
-
 class FormularyCreateView(APIView):
     permission_classes = [IsAuthenticated, IsPharmacist | IsAdmin]
     serializer_class = FormularyItemSerializer
@@ -697,11 +680,6 @@ class FormularyCreateView(APIView):
             FormularyItemSerializer(item, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
-
-# ---------------------------------------------------------------------------
-# Interventions
-# ---------------------------------------------------------------------------
 
 class PharmacyInterventionListCreateView(APIView):
     permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
@@ -727,7 +705,6 @@ class PharmacyInterventionListCreateView(APIView):
         serializer = PharmacyInterventionSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         intervention = serializer.save(pharmacist=request.user)
-        # Notify the prescribing doctor in real time
         prescriber = getattr(
             getattr(getattr(intervention, "prescription", None), "original_prescription", None),
             "prescribed_by",
@@ -753,7 +730,6 @@ class PharmacyInterventionListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class PharmacyInterventionRespondView(APIView):
     permission_classes = [IsAuthenticated, PharmacyDoctorResponsePermission]
     serializer_class = PharmacyInterventionSerializer
@@ -764,7 +740,6 @@ class PharmacyInterventionRespondView(APIView):
         except PharmacyIntervention.DoesNotExist:
             raise NotFoundError("Intervention not found.")
         prescriber = getattr(getattr(intervention.prescription, "original_prescription", None), "prescribed_by", None)
-        # Doctors must be the prescribing doctor; pharmacists can record the outcome on the prescriber's behalf
         if request.user.role == "doctor" and prescriber and request.user.id != prescriber.id:
             raise ConflictError("Only the prescribing doctor can respond to this intervention.")
         intervention.prescriber_response = request.data.get("response", intervention.prescriber_response or "")
@@ -774,11 +749,6 @@ class PharmacyInterventionRespondView(APIView):
         return Response(PharmacyInterventionSerializer(intervention, context={"request": request}).data)
 
     post = put
-
-
-# ---------------------------------------------------------------------------
-# Refills  (was missing entirely)
-# ---------------------------------------------------------------------------
 
 class RefillListCreateView(APIView):
     """GET/POST /pharmacy/refills/"""
@@ -801,7 +771,6 @@ class RefillListCreateView(APIView):
             raise ConflictError("Only pharmacists can create refill records.")
         serializer = RefillSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        # Validate remaining refill count against original prescription
         rx_prescription = serializer.validated_data.get("prescription")
         if rx_prescription:
             orig = getattr(rx_prescription, "original_prescription", None)
@@ -820,11 +789,6 @@ class RefillListCreateView(APIView):
             RefillSerializer(refill, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
-
-# ---------------------------------------------------------------------------
-# Substitutions  (was missing entirely)
-# ---------------------------------------------------------------------------
 
 class SubstitutionListCreateView(APIView):
     """GET/POST /pharmacy/substitutions/"""
@@ -852,7 +816,6 @@ class SubstitutionListCreateView(APIView):
             approved_by=None,
             status=request.data.get("status") or SubstitutionStatus.PENDING,
         )
-        # Notify the prescribing doctor that a substitution was proposed
         prescriber = getattr(
             getattr(getattr(sub, "prescription", None), "original_prescription", None),
             "prescribed_by",
@@ -879,7 +842,6 @@ class SubstitutionListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class SubstitutionDetailView(APIView):
     """GET/PUT /pharmacy/substitutions/:id/"""
     permission_classes = [IsAuthenticated, PharmacyReadWritePermission]
@@ -904,7 +866,6 @@ class SubstitutionDetailView(APIView):
             save_kwargs["approved_by"] = request.user
         serializer.save(**save_kwargs)
         sub.refresh_from_db()
-        # Notify prescribing doctor when substitution is approved or rejected
         new_status = request.data.get("status")
         if new_status in (SubstitutionStatus.APPROVED, SubstitutionStatus.REJECTED):
             prescriber = getattr(
@@ -933,11 +894,6 @@ class SubstitutionDetailView(APIView):
             )
         return Response(SubstitutionSerializer(sub, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Pharmacy CDSS — KG Safety Check & MedGemma AI Consult
-# ---------------------------------------------------------------------------
-
 class PharmacyKGSafetyView(APIView):
     """
     GET /pharmacy/patients/<patient_pk>/kg_safety/
@@ -961,7 +917,6 @@ class PharmacyKGSafetyView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         return Response(safety)
-
 
 class PharmacyPatientAIConsultView(APIView):
     """
@@ -988,7 +943,6 @@ class PharmacyPatientAIConsultView(APIView):
             "query": prompt_query,
             "response": response_text,
         })
-
 
 class PharmacyRxAIConsultView(APIView):
     """

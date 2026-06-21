@@ -37,7 +37,6 @@ export function PatientSearchBar({
     const router = useRouter();
     const token = useAuthStore((state) => state.token);
 
-    // Global Ctrl+K shortcut
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "k") {

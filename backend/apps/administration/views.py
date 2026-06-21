@@ -13,8 +13,10 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+import re
+
 from core.audit import write_audit_log, AuditAction, AuditSeverity
-from core.exceptions import NotFoundError, ConflictError
+from core.exceptions import NotFoundError, ConflictError, ValidationAppError
 from core.pagination import StandardPagination
 from core.permissions import IsAdmin, IsFrontDesk, IsStaff
 from core.utils import generate_temp_password
@@ -29,9 +31,6 @@ from .serializers import (
     AuditLogSerializer, SystemSettingSerializer, RolePermissionSerializer,
     LabCatalogSerializer, RadiologyCatalogSerializer, ServiceCatalogSerializer,
 )
-
-
-# ─── Users ────────────────────────────────────────────────────────────────────
 
 class AdminUserListView(APIView):
     permission_classes = [IsAdmin | IsFrontDesk]
@@ -78,11 +77,42 @@ class AdminUserListView(APIView):
         return paginator.get_paginated_response(UserProfileSerializer(page, many=True).data)
 
     def post(self, request):
-        from apps.authentication.models import User, UserStatus
+        from apps.authentication.models import User, UserRole, UserStatus
         from apps.authentication.serializers import UserProfileSerializer
 
         data = request.data
-        email = data.get("email")
+
+        email = str(data.get("email") or "").strip().lower()
+        if not email:
+            raise ValidationAppError("email is required.")
+        if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+            raise ValidationAppError("email must be a valid email address.")
+        if len(email) > 254:
+            raise ValidationAppError("email must not exceed 254 characters.")
+
+        first_name = str(data.get("firstName") or "").strip()
+        last_name = str(data.get("lastName") or "").strip()
+        if not first_name:
+            raise ValidationAppError("firstName is required.")
+        if not last_name:
+            raise ValidationAppError("lastName is required.")
+        if len(first_name) > 100 or len(last_name) > 100:
+            raise ValidationAppError("firstName and lastName must not exceed 100 characters each.")
+        if not re.match(r"^[\w\s'\-\.]+$", first_name) or not re.match(r"^[\w\s'\-\.]+$", last_name):
+            raise ValidationAppError("Name fields must contain only letters, spaces, hyphens, apostrophes, or dots.")
+
+        role = str(data.get("role") or "").strip()
+        valid_roles = {r[0] for r in UserRole.choices}
+        if not role or role not in valid_roles:
+            raise ValidationAppError(f"role must be one of: {sorted(valid_roles)}.")
+
+        employee_id = str(data.get("employeeId") or "").strip() or None
+        if employee_id and len(employee_id) > 50:
+            raise ValidationAppError("employeeId must not exceed 50 characters.")
+
+        specialization = str(data.get("specialization") or "").strip()[:200] or None
+        license_number = str(data.get("licenseNumber") or "").strip()[:100] or None
+
         if User.objects.filter(email=email).exists():
             raise ConflictError(f"User with email {email!r} already exists.", code="EMAIL_CONFLICT")
 
@@ -90,22 +120,20 @@ class AdminUserListView(APIView):
         user = User.objects.create_user(
             email=email,
             password=temp_password,
-            first_name=data.get("firstName", ""),
-            last_name=data.get("lastName", ""),
-            role=data.get("role"),
+            first_name=first_name,
+            last_name=last_name,
+            role=role,
             department_id=data.get("departmentId"),
-            employee_id=data.get("employeeId"),
-            specialization=data.get("specialization"),
-            license_number=data.get("licenseNumber"),
+            employee_id=employee_id,
+            specialization=specialization,
+            license_number=license_number,
             status=UserStatus.ACTIVE,
         )
         write_audit_log(
             request=request, action=AuditAction.CREATE, resource="users",
             resource_id=user.id, details={"email": email, "role": user.role}
         )
-        # TODO: send welcome email with temp_password
         return Response(UserProfileSerializer(user).data, status=status.HTTP_201_CREATED)
-
 
 class AdminUserDetailView(APIView):
     permission_classes = [IsAdmin]
@@ -124,18 +152,46 @@ class AdminUserDetailView(APIView):
         return Response(UserProfileSerializer(user).data)
 
     def put(self, request, user_id):
+        from apps.authentication.models import UserRole
         from apps.authentication.serializers import UserProfileSerializer
         user = self._get_user(user_id)
-        allowed = ["firstName", "lastName", "role", "departmentId", "employeeId", "specialization", "licenseNumber", "avatar"]
-        field_map = {
-            "firstName": "first_name", "lastName": "last_name",
-            "departmentId": "department_id", "employeeId": "employee_id",
-            "licenseNumber": "license_number",
-        }
-        for key, value in request.data.items():
-            if key in allowed:
-                db_field = field_map.get(key, key)
-                setattr(user, db_field, value)
+        data = request.data
+
+        if "firstName" in data:
+            v = str(data["firstName"]).strip()
+            if not v or len(v) > 100:
+                raise ValidationAppError("firstName must be 1–100 characters.")
+            if not re.match(r"^[\w\s'\-\.]+$", v):
+                raise ValidationAppError("firstName contains invalid characters.")
+            user.first_name = v
+        if "lastName" in data:
+            v = str(data["lastName"]).strip()
+            if not v or len(v) > 100:
+                raise ValidationAppError("lastName must be 1–100 characters.")
+            if not re.match(r"^[\w\s'\-\.]+$", v):
+                raise ValidationAppError("lastName contains invalid characters.")
+            user.last_name = v
+        if "role" in data:
+            v = str(data["role"]).strip()
+            valid_roles = {r[0] for r in UserRole.choices}
+            if v not in valid_roles:
+                raise ValidationAppError(f"role must be one of: {sorted(valid_roles)}.")
+            user.role = v
+        if "departmentId" in data:
+            user.department_id = data["departmentId"] or None
+        if "employeeId" in data:
+            v = str(data["employeeId"] or "").strip()[:50] or None
+            user.employee_id = v
+        if "specialization" in data:
+            user.specialization = str(data["specialization"] or "").strip()[:200] or None
+        if "licenseNumber" in data:
+            user.license_number = str(data["licenseNumber"] or "").strip()[:100] or None
+        if "avatar" in data:
+            av = str(data["avatar"] or "").strip()
+            if av and not av.startswith(("http://", "https://", "/media/", "/")):
+                raise ValidationAppError("avatar must be a valid URL or media path.")
+            user.avatar = av or None
+
         user.save()
         write_audit_log(request=request, action=AuditAction.UPDATE, resource="users", resource_id=user_id)
         return Response(UserProfileSerializer(user).data)
@@ -148,7 +204,6 @@ class AdminUserDetailView(APIView):
         write_audit_log(request=request, action=AuditAction.DELETE, resource="users", resource_id=user_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
 class AdminUserStatusView(APIView):
     permission_classes = [IsAdmin]
 
@@ -158,14 +213,18 @@ class AdminUserStatusView(APIView):
             user = User.objects.get(id=user_id, deleted_at__isnull=True)
         except User.DoesNotExist:
             raise NotFoundError("User not found.")
-        user.status = request.data.get("status", user.status)
+        new_status = str(request.data.get("status") or "").strip()
+        from apps.authentication.models import UserStatus
+        valid_statuses = {s[0] for s in UserStatus.choices}
+        if not new_status or new_status not in valid_statuses:
+            raise ValidationAppError(f"status must be one of: {sorted(valid_statuses)}.")
+        user.status = new_status
         user.save(update_fields=["status"])
         write_audit_log(
             request=request, action=AuditAction.UPDATE, resource="users", resource_id=user_id,
             details={"status": user.status}
         )
         return Response({"status": user.status})
-
 
 class AdminUserResetPasswordView(APIView):
     permission_classes = [IsAdmin]
@@ -185,7 +244,6 @@ class AdminUserResetPasswordView(APIView):
         )
         return Response({"message": "Password reset. Temporary password sent via email."})
 
-
 class AdminUserActivityView(APIView):
     permission_classes = [IsAdmin]
     serializer_class = AuditLogSerializer
@@ -195,9 +253,6 @@ class AdminUserActivityView(APIView):
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
         return paginator.get_paginated_response(AuditLogSerializer(page, many=True).data)
-
-
-# ─── Departments ──────────────────────────────────────────────────────────────
 
 class DepartmentListView(APIView):
     permission_classes = [IsAdmin | IsFrontDesk]
@@ -220,7 +275,6 @@ class DepartmentListView(APIView):
         write_audit_log(request=request, action=AuditAction.CREATE, resource="departments", resource_id=dept.id)
         return Response(DepartmentSerializer(dept).data, status=status.HTTP_201_CREATED)
 
-
 class DepartmentDetailView(APIView):
     permission_classes = [IsAdmin]
     serializer_class = DepartmentSerializer
@@ -239,11 +293,9 @@ class DepartmentDetailView(APIView):
         serializer = DepartmentSerializer(dept, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        # Refresh from DB to avoid returning stale pre-save field values in the response
         dept.refresh_from_db()
         write_audit_log(request=request, action=AuditAction.UPDATE, resource="departments", resource_id=dept_id)
         return Response(DepartmentSerializer(dept).data)
-
 
 class DepartmentStatusView(APIView):
     permission_classes = [IsAdmin]
@@ -256,9 +308,6 @@ class DepartmentStatusView(APIView):
         dept.status = request.data.get("status", dept.status)
         dept.save(update_fields=["status"])
         return Response({"status": dept.status})
-
-
-# ─── Wards ────────────────────────────────────────────────────────────────────
 
 class WardListView(APIView):
     permission_classes = [IsAdmin | IsFrontDesk]
@@ -283,7 +332,6 @@ class WardListView(APIView):
         write_audit_log(request=request, action=AuditAction.CREATE, resource="wards", resource_id=ward.id)
         return Response(WardSerializer(ward).data, status=status.HTTP_201_CREATED)
 
-
 class WardDetailView(APIView):
     permission_classes = [IsAdmin]
     serializer_class = WardSerializer
@@ -306,9 +354,6 @@ class WardDetailView(APIView):
         ward.refresh_from_db()
         return Response(WardSerializer(ward).data)
 
-
-# ─── Beds ─────────────────────────────────────────────────────────────────────
-
 class AdminBedListView(APIView):
     permission_classes = [IsAdmin | IsFrontDesk]
     serializer_class = BedSerializer
@@ -329,13 +374,11 @@ class AdminBedListView(APIView):
         s = BedSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         bed = s.save()
-        # Update ward total_beds count
         ward = bed.ward
         ward.total_beds = Bed.objects.filter(ward=ward).count()
         ward.save(update_fields=["total_beds"])
         write_audit_log(request=request, action=AuditAction.CREATE, resource="beds", resource_id=bed.id)
         return Response(BedSerializer(bed).data, status=status.HTTP_201_CREATED)
-
 
 class AdminBedDetailView(APIView):
     permission_classes = [IsAdmin]
@@ -360,9 +403,6 @@ class AdminBedDetailView(APIView):
         bed.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-# ─── Catalogs ─────────────────────────────────────────────────────────────────
-
 class LabCatalogView(APIView):
     permission_classes = [IsAdmin]
     serializer_class = LabCatalogSerializer
@@ -379,7 +419,6 @@ class LabCatalogView(APIView):
         item = s.save()
         return Response(LabCatalogSerializer(item).data, status=status.HTTP_201_CREATED)
 
-
 class LabCatalogDetailView(APIView):
     permission_classes = [IsAdmin]
     serializer_class = LabCatalogSerializer
@@ -394,7 +433,6 @@ class LabCatalogDetailView(APIView):
         s.save()
         item.refresh_from_db()
         return Response(LabCatalogSerializer(item).data)
-
 
 class RadiologyCatalogView(APIView):
     permission_classes = [IsAdmin]
@@ -412,7 +450,6 @@ class RadiologyCatalogView(APIView):
         item = s.save()
         return Response(RadiologyCatalogSerializer(item).data, status=status.HTTP_201_CREATED)
 
-
 class RadiologyCatalogDetailView(APIView):
     permission_classes = [IsAdmin]
     serializer_class = RadiologyCatalogSerializer
@@ -427,7 +464,6 @@ class RadiologyCatalogDetailView(APIView):
         s.save()
         item.refresh_from_db()
         return Response(RadiologyCatalogSerializer(item).data)
-
 
 class ServiceCatalogView(APIView):
     permission_classes = [IsAdmin]
@@ -445,7 +481,6 @@ class ServiceCatalogView(APIView):
         item = s.save()
         return Response(ServiceCatalogSerializer(item).data, status=status.HTTP_201_CREATED)
 
-
 class ServiceCatalogDetailView(APIView):
     permission_classes = [IsAdmin]
     serializer_class = ServiceCatalogSerializer
@@ -460,9 +495,6 @@ class ServiceCatalogDetailView(APIView):
         s.save()
         item.refresh_from_db()
         return Response(ServiceCatalogSerializer(item).data)
-
-
-# ─── Audit Log ────────────────────────────────────────────────────────────────
 
 class AuditLogView(APIView):
     permission_classes = [IsAdmin]
@@ -492,9 +524,6 @@ class AuditLogView(APIView):
         page = paginator.paginate_queryset(qs, request)
         return paginator.get_paginated_response(AuditLogSerializer(page, many=True).data)
 
-
-# ─── Settings ─────────────────────────────────────────────────────────────────
-
 class SettingsView(APIView):
     permission_classes = [IsAdmin]
     serializer_class = SystemSettingSerializer
@@ -518,9 +547,6 @@ class SettingsView(APIView):
         )
         return Response({"message": "Settings updated."})
 
-
-# ─── Permissions ──────────────────────────────────────────────────────────────
-
 class PermissionsView(APIView):
     permission_classes = [IsAdmin]
     serializer_class = RolePermissionSerializer
@@ -542,9 +568,6 @@ class PermissionsView(APIView):
             severity="warning",
         )
         return Response({"message": "Permissions updated."})
-
-
-# ─── Admin Stats ──────────────────────────────────────────────────────────────
 
 class AdminStatsView(APIView):
     permission_classes = [IsAdmin]

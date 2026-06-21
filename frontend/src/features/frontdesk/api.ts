@@ -103,6 +103,13 @@ export function createPatient(payload: Record<string, unknown>, token?: string |
   });
 }
 
+export function reassignDoctor(patientId: string, doctorId: string | null, token?: string | null) {
+  return apiFetch(`/patients/${patientId}/`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify({ assignedDoctorId: doctorId ?? "" }),
+  }) as Promise<ADTPatient>;
+}
 
 export function listAdmissions(query: { status?: string; patientId?: string } = {}, token?: string | null) {
   return getPaginatedList<Admission>(withQuery("/patients/admissions/", query), token);

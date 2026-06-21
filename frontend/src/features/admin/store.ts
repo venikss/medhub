@@ -5,35 +5,29 @@ import type {
 } from "@/types";
 
 interface AdminStore {
-  // Users
   selectedUserId: string | null;
   userStatusFilter: AdminUserStatus | "all";
   userRoleFilter: AdminUserRole | "all";
   userSearch: string;
   selectedUserIds: string[];
 
-  // Departments
   selectedDepartmentId: string | null;
   departmentStatusFilter: DepartmentStatus | "all";
 
-  // Beds
   selectedWardId: string | null;
   bedStatusFilter: BedStatus | "all";
   selectedBedIds: string[];
 
-  // Catalogs
   activeCatalogTab: "lab" | "radiology" | "services";
   catalogStatusFilter: CatalogItemStatus | "all";
   catalogSearch: string;
 
-  // Audit
   auditSeverityFilter: AuditSeverity | "all";
   auditActionFilter: AuditAction | "all";
   auditUserFilter: string;
   auditDateFrom: string;
   auditDateTo: string;
 
-  // Modals
   showUserForm: boolean;
   showDepartmentForm: boolean;
   showBedForm: boolean;
@@ -41,7 +35,6 @@ interface AdminStore {
   showDeleteConfirm: boolean;
   deleteTarget: { type: string; id: string; name: string } | null;
 
-  // Actions
   setSelectedUser: (id: string | null) => void;
   setUserStatusFilter: (f: AdminUserStatus | "all") => void;
   setUserRoleFilter: (f: AdminUserRole | "all") => void;

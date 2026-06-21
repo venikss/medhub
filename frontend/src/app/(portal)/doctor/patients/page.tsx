@@ -3,10 +3,10 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ChevronRight, Search } from "lucide-react";
+import { BedDouble, ChevronRight, Clock, Search, Stethoscope, UserRound } from "lucide-react";
 import { StatusBadge } from "@/components/atoms/StatusBadge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import {} from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
@@ -25,6 +25,7 @@ type DoctorPatientRow = {
   ward?: string | null;
   roomNumber?: string | null;
   diagnosis?: string | null;
+  admittedAt?: string | null;
 };
 
 function splitName(fullName: string) {
@@ -108,6 +109,7 @@ function MyPatientsPage() {
           ward: item.ward,
           roomNumber: item.bed,
           diagnosis: item.reasonForAdmission,
+          admittedAt: item.admittedAt,
         });
       });
 
@@ -143,6 +145,22 @@ function MyPatientsPage() {
       );
     });
 
+  function timeSince(dateStr?: string | null): string {
+    if (!dateStr) return "";
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const hours = Math.floor(diff / 3_600_000);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+
+  const acuityColors: Record<string, string> = {
+    critical: "bg-red-500 text-white",
+    admitted: "bg-sky-500 text-white",
+    active: "bg-emerald-500 text-white",
+    stable: "bg-slate-400 text-white",
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -162,7 +180,7 @@ function MyPatientsPage() {
             className="h-10 pl-10"
           />
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {filters.map((item) => (
             <button
               key={item}
@@ -175,44 +193,79 @@ function MyPatientsPage() {
         </div>
       </div>
 
-      <div className="space-y-2">
-        {patients.length === 0 ? (
-          <Card className="border-border/50">
-            <CardContent className="py-12 text-center">
-              <p className="text-sm text-muted-foreground">No patients matching filter.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          patients.map((patient) => (
-            <Link
-              key={patient.patientId}
-              href={`/doctor/patients/${patient.patientId}`}
-              className="group flex items-center gap-4 rounded-lg border border-border/50 bg-card p-4 transition-all hover:border-primary/30 hover:shadow-md"
-            >
-              <Avatar className="h-10 w-10 border">
-                <AvatarFallback className={`text-xs font-bold ${patient.status === "critical" ? "bg-red-500/15 text-red-600" : "bg-primary/10 text-primary"}`}>
-                  {(patient.firstName[0] ?? "").toUpperCase()}{(patient.lastName[0] ?? "").toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold">{patient.patientName}</p>
+      {patients.length === 0 ? (
+        <Card className="border-border/50">
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+            <UserRound className="h-12 w-12 text-muted-foreground/20" />
+            <p className="text-sm font-medium">No patients match this filter</p>
+            <p className="text-xs text-muted-foreground/70">Admitted patients and appointments will appear here</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {patients.map((patient) => {
+            const acuityClass = acuityColors[patient.status] ?? acuityColors.stable;
+            const initials = `${(patient.firstName[0] ?? "").toUpperCase()}${(patient.lastName[0] ?? "").toUpperCase()}`;
+            return (
+              <Link
+                key={patient.patientId}
+                href={`/doctor/patients/${patient.patientId}`}
+                className="group relative flex flex-col gap-0 rounded-xl border border-border/50 bg-card shadow-sm transition-all hover:border-primary/40 hover:shadow-md overflow-hidden"
+              >
+                {/* Acuity color top bar */}
+                <div className={`h-1.5 w-full ${patient.status === "critical" ? "bg-red-500" : patient.status === "admitted" ? "bg-sky-500" : patient.status === "active" ? "bg-emerald-500" : "bg-slate-300"}`} />
+
+                <div className="flex items-start gap-4 p-4">
+                  {/* Avatar */}
+                  <Avatar className="h-12 w-12 shrink-0 border-2 border-border/50">
+                    <AvatarFallback className={`text-sm font-bold ${patient.status === "critical" ? "bg-red-500/15 text-red-600" : "bg-primary/10 text-primary"}`}>
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  {/* Info */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold leading-tight">{patient.patientName}</p>
+                        <span className="mt-0.5 inline-block rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{patient.mrn ?? "—"}</span>
+                      </div>
+                      <StatusBadge status={patient.status} />
+                    </div>
+
+                    {/* Location */}
+                    {(patient.ward || patient.roomNumber) && (
+                      <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <BedDouble className="h-3.5 w-3.5 shrink-0 text-sky-500" />
+                        <span>{[patient.ward, patient.roomNumber ? `Bed ${patient.roomNumber}` : null].filter(Boolean).join(" · ")}</span>
+                      </div>
+                    )}
+
+                    {/* Diagnosis */}
+                    {patient.diagnosis && (
+                      <div className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
+                        <Stethoscope className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                        <span className="line-clamp-2">{patient.diagnosis}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                  {patient.mrn && <span className="font-mono">{patient.mrn}</span>}
-                  {patient.ward && <><span>·</span><span>{patient.ward} Rm {patient.roomNumber ?? "-"}</span></>}
-                  {patient.diagnosis && <><span>·</span><span className="max-w-[240px] truncate">{patient.diagnosis}</span></>}
+
+                {/* Footer */}
+                <div className="flex items-center justify-between border-t border-border/30 bg-muted/20 px-4 py-2">
+                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span>{timeSince(patient.admittedAt) || "—"}</span>
+                  </div>
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-primary transition-colors group-hover:text-primary/80">
+                    View Chart <ChevronRight className="h-3 w-3" />
+                  </span>
                 </div>
-              </div>
-              {patient.status === "critical" && (
-                <Badge variant="destructive" className="text-[10px]">Critical</Badge>
-              )}
-              <StatusBadge status={patient.status} />
-              <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-colors group-hover:text-primary" />
-            </Link>
-          ))
-        )}
-      </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

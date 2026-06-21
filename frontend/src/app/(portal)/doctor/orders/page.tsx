@@ -5,13 +5,13 @@ import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StatusBadge } from "@/components/atoms/StatusBadge";
 import { StatCard } from "@/components/molecules/StatCard";
 import { OrderComposer } from "@/features/doctor/components/OrderComposer";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { createDoctorOrder, type DoctorAdmission, type DoctorChartPatient, type DoctorOrder, getDoctorPatientChart, listAdmissions, listDoctorOrders } from "@/features/doctor/api";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardList, Clock, CheckCircle2, AlertTriangle, Plus } from "lucide-react";
+import { BedDouble, ClipboardList, Clock, CheckCircle2, AlertTriangle, Plus, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { OrderCategory, Priority } from "@/types";
 
@@ -137,22 +137,59 @@ function OrdersPageInner() {
         </Button>
       </div>
 
-      {!urlPatientId && (
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-muted-foreground shrink-0">Patient</span>
-          <Select value={selectedPatientId ?? ""} onValueChange={(v) => setSelectedPatientId(v || undefined)}>
-            <SelectTrigger className="w-72">
-              <SelectValue placeholder="Select a patient…" />
-            </SelectTrigger>
-            <SelectContent>
-              {patients.map((p) => (
-                <SelectItem key={p.patientId} value={p.patientId}>
-                  {p.patientName} — {p.mrn}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {!urlPatientId && patients.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-muted-foreground">Select a patient to manage their orders</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {patients.map((p) => {
+              const isSelected = selectedPatientId === p.patientId;
+              const initials = p.patientName
+                .split(" ")
+                .map((n) => n[0] ?? "")
+                .slice(0, 2)
+                .join("")
+                .toUpperCase();
+              return (
+                <button
+                  key={p.patientId}
+                  onClick={() => setSelectedPatientId(p.patientId)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border p-3 text-left transition-all",
+                    isSelected
+                      ? "border-primary bg-primary/5 shadow-md ring-1 ring-primary/30"
+                      : "border-border/50 bg-card hover:border-primary/30 hover:shadow-sm",
+                  )}
+                >
+                  <Avatar className="h-10 w-10 shrink-0">
+                    <AvatarFallback className={cn("text-xs font-bold", isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{p.patientName}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground">{p.mrn}</p>
+                    {p.ward && (
+                      <div className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <BedDouble className="h-3 w-3 text-sky-500" />
+                        <span>{p.ward}{p.bed ? ` · ${p.bed}` : ""}</span>
+                      </div>
+                    )}
+                  </div>
+                  {isSelected && <div className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                </button>
+              );
+            })}
+          </div>
         </div>
+      )}
+
+      {!urlPatientId && patients.length === 0 && (
+        <Card className="border-border/50">
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-muted-foreground">
+            <UserRound className="h-10 w-10 text-muted-foreground/20" />
+            <p className="text-sm">No admitted patients assigned to you yet</p>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

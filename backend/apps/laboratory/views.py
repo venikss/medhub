@@ -37,12 +37,10 @@ from .serializers import (
     ANALYZER_QUEUE_STATUS_FROM_API, LAB_PANEL_STATUS_FROM_API,
 )
 
-
 LabReadWritePermission = ReadWriteRolePermission.for_roles(
     [UserRole.LAB_TECH, UserRole.DOCTOR],
     [UserRole.LAB_TECH],
 )
-
 
 def _create_cdss_panic_value(result, patient_id):
     """Create CDSS recommendation for a critical lab value."""
@@ -80,12 +78,7 @@ def _create_cdss_panic_value(result, patient_id):
             "targetRoles": rec.target_roles,
         }, target_roles=rec.target_roles)
     except Exception:
-        pass  # CDSS failure must never break the lab workflow
-
-
-# ---------------------------------------------------------------------------
-# Worklist
-# ---------------------------------------------------------------------------
+        pass
 
 class LabWorklistView(APIView):
     """GET /lab/worklist"""
@@ -97,7 +90,6 @@ class LabWorklistView(APIView):
         if s := request.query_params.get("status"):
             qs = qs.filter(status=LAB_PANEL_STATUS_FROM_API.get(s, s))
         else:
-            # Default: active work — exclude released panels
             qs = qs.exclude(status=LabPanelStatus.RELEASED)
 
         if priority := request.query_params.get("priority"):
@@ -114,11 +106,6 @@ class LabWorklistView(APIView):
         return paginator.get_paginated_response(
             LabPanelWithResultsSerializer(page, many=True, context={"request": request}).data
         )
-
-
-# ---------------------------------------------------------------------------
-# Specimens
-# ---------------------------------------------------------------------------
 
 class SpecimenListCreateView(APIView):
     permission_classes = [IsAuthenticated, LabReadWritePermission]
@@ -144,7 +131,6 @@ class SpecimenListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class SpecimenDetailView(APIView):
     permission_classes = [IsAuthenticated, LabReadWritePermission]
 
@@ -167,7 +153,6 @@ class SpecimenDetailView(APIView):
         specimen.refresh_from_db()
         return Response(SpecimenSerializer(specimen, context={"request": request}).data)
 
-
 class SpecimenReceiveView(APIView):
     permission_classes = [IsAuthenticated, IsLabTech]
 
@@ -182,7 +167,6 @@ class SpecimenReceiveView(APIView):
         specimen.condition = request.data.get("condition", "acceptable")
         specimen.save(update_fields=["status", "received_at", "received_by", "condition"])
         return Response(SpecimenSerializer(specimen, context={"request": request}).data)
-
 
 class SpecimenRejectView(APIView):
     permission_classes = [IsAuthenticated, IsLabTech]
@@ -199,7 +183,6 @@ class SpecimenRejectView(APIView):
         specimen.rejection_reason = reason
         specimen.save(update_fields=["status", "rejection_reason"])
         return Response(SpecimenSerializer(specimen, context={"request": request}).data)
-
 
 class SpecimenRecollectView(APIView):
     """POST /specimens/recollect"""
@@ -238,7 +221,6 @@ class SpecimenRecollectView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class RecollectionRequestListView(APIView):
     """GET /lab/recollections"""
     permission_classes = [IsAuthenticated, LabReadWritePermission]
@@ -274,11 +256,6 @@ class RecollectionRequestListView(APIView):
             })
         return paginator.get_paginated_response(data)
 
-
-# ---------------------------------------------------------------------------
-# Accessions
-# ---------------------------------------------------------------------------
-
 class AccessionListCreateView(APIView):
     permission_classes = [IsAuthenticated, LabReadWritePermission]
 
@@ -295,7 +272,6 @@ class AccessionListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         acc_num = generate_accession_number("LAB")
         accession = serializer.save(accession_number=acc_num, received_by=request.user)
-        # Auto-advance specimen to received
         specimen = accession.specimen
         if specimen.status in (SpecimenStatus.ORDERED, SpecimenStatus.COLLECTED, "in-transit"):
             specimen.status = SpecimenStatus.RECEIVED
@@ -306,7 +282,6 @@ class AccessionListCreateView(APIView):
             AccessionSerializer(accession, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
 
 class AccessionDetailView(APIView):
     permission_classes = [IsAuthenticated, LabReadWritePermission]
@@ -330,11 +305,6 @@ class AccessionDetailView(APIView):
         acc.refresh_from_db()
         return Response(AccessionSerializer(acc, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Analyzer Queue
-# ---------------------------------------------------------------------------
-
 class AnalyzerQueueListView(APIView):
     """GET /lab/analyzers/queue"""
     permission_classes = [IsAuthenticated, IsLabTech]
@@ -352,7 +322,6 @@ class AnalyzerQueueListView(APIView):
             item["queuePosition"] = idx
         return paginator.get_paginated_response(data)
 
-
 class AnalyzerQueueStatusView(APIView):
     """PUT /lab/analyzers/queue/:id/status"""
     permission_classes = [IsAuthenticated, IsLabTech]
@@ -364,7 +333,6 @@ class AnalyzerQueueStatusView(APIView):
             raise NotFoundError("Analyzer queue entry not found.")
 
         new_status = ANALYZER_QUEUE_STATUS_FROM_API.get(request.data.get("status"), request.data.get("status"))
-        # TextChoices.choices gives [(value, label), ...] â€” extract values correctly
         allowed = [c[0] for c in AnalyzerQueueStatus.choices]
         if new_status not in allowed:
             raise ValidationAppError(f"Invalid status. Allowed: {allowed}")
@@ -384,7 +352,6 @@ class AnalyzerQueueStatusView(APIView):
 
         entry.save(update_fields=update_fields)
 
-        # Auto-advance specimen status based on analyzer queue status
         specimen = entry.specimen
         if new_status == AnalyzerQueueStatus.IN_PROGRESS and specimen.status == SpecimenStatus.RECEIVED:
             specimen.status = SpecimenStatus.PROCESSING
@@ -393,7 +360,6 @@ class AnalyzerQueueStatusView(APIView):
             specimen.status = SpecimenStatus.ANALYZED
             specimen.save(update_fields=["status"])
 
-        # When analysis completes, ensure LabPanel + result placeholders exist
         if new_status == AnalyzerQueueStatus.COMPLETED:
             panels = LabPanel.objects.filter(specimen=specimen)
             if not panels.exists():
@@ -424,11 +390,6 @@ class AnalyzerQueueStatusView(APIView):
 
         return Response(AnalyzerQueueSerializer(entry, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Lab Panels
-# ---------------------------------------------------------------------------
-
 class LabPanelListCreateView(APIView):
     permission_classes = [IsAuthenticated, LabReadWritePermission]
 
@@ -453,7 +414,6 @@ class LabPanelListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class LabPanelDetailView(APIView):
     """GET /lab/panels/:id â€” returns panel with results inline."""
     permission_classes = [IsAuthenticated, LabReadWritePermission]
@@ -468,7 +428,6 @@ class LabPanelDetailView(APIView):
         return Response(
             LabPanelWithResultsSerializer(self._get(pk), context={"request": request}).data
         )
-
 
 class LabPanelResultsView(APIView):
     """POST /lab/panels/:id/results â€” enter results for a panel."""
@@ -519,7 +478,6 @@ class LabPanelResultsView(APIView):
             panel.report.has_critical = panel.has_critical
             panel.report.save(update_fields=["has_critical"])
 
-        # Auto-advance specimen to resulted
         specimen = panel.specimen
         if specimen and specimen.status in (SpecimenStatus.RECEIVED, SpecimenStatus.PROCESSING, SpecimenStatus.ANALYZED):
             specimen.status = SpecimenStatus.RESULTED
@@ -529,7 +487,6 @@ class LabPanelResultsView(APIView):
             LabTestResultSerializer(created, many=True, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
 
 class LabPanelVerifyView(APIView):
     """PUT /lab/panels/:id/verify â€” panel-level verification."""
@@ -545,8 +502,6 @@ class LabPanelVerifyView(APIView):
             raise ConflictError("Panel already verified.")
 
         now = timezone.now()
-        # update_fields on queryset.update() â€” verified_by and verified_at need
-        # to be set per-result; use a loop for FK assignment
         panel.results.filter(
             status__in=[LabResultStatus.PRELIMINARY, LabResultStatus.FINAL]
         ).update(
@@ -566,11 +521,6 @@ class LabPanelVerifyView(APIView):
         )
         panel.refresh_from_db()
         return Response(LabPanelWithResultsSerializer(panel, context={"request": request}).data)
-
-
-# ---------------------------------------------------------------------------
-# Lab Test Results
-# ---------------------------------------------------------------------------
 
 class LabResultListCreateView(APIView):
     permission_classes = [IsAuthenticated, LabReadWritePermission]
@@ -596,7 +546,6 @@ class LabResultListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class LabResultDetailView(APIView):
     """GET /lab/results/:id â€” single result detail (was missing)."""
     permission_classes = [IsAuthenticated, LabReadWritePermission]
@@ -608,7 +557,6 @@ class LabResultDetailView(APIView):
             raise NotFoundError("Lab result not found.")
         write_audit_log(request, AuditAction.READ, "LabTestResult", str(result.id))
         return Response(LabTestResultSerializer(result, context={"request": request}).data)
-
 
 class LabResultVerifyView(APIView):
     permission_classes = [IsAuthenticated, IsLabTech]
@@ -630,11 +578,6 @@ class LabResultVerifyView(APIView):
         )
         return Response(LabTestResultSerializer(result, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Lab Reports
-# ---------------------------------------------------------------------------
-
 class LabReportListView(APIView):
     permission_classes = [IsAuthenticated, LabReadWritePermission]
 
@@ -652,7 +595,6 @@ class LabReportListView(APIView):
             LabReportSerializer(page, many=True, context={"request": request}).data
         )
 
-
 class LabReportDetailView(APIView):
     permission_classes = [IsAuthenticated, LabReadWritePermission]
 
@@ -666,13 +608,11 @@ class LabReportDetailView(APIView):
         write_audit_log(request, AuditAction.READ, "LabReport", str(report.id))
         return Response(LabReportSerializer(report, context={"request": request}).data)
 
-
 class LabReportReleaseView(APIView):
     permission_classes = [IsAuthenticated, IsLabTech]
 
     def put(self, request, pk):
         try:
-            # Fixed: results is a reverse relation â€” use prefetch_related, not select_related
             report = LabReport.objects.select_related(
                 "patient", "panel__order__ordered_by"
             ).prefetch_related("panel__results").get(id=pk)
@@ -692,7 +632,6 @@ class LabReportReleaseView(APIView):
         report.has_critical = report_has_critical
         report.save(update_fields=["status", "released_by", "released_at", "notes", "has_critical"])
         
-        # Integration: Notify ordering doctor about release
         ordering_doctor_id = report.panel.order.ordered_by_id if report.panel.order else None
         assigned_doctor_id = report.patient.assigned_doctor_id
         
@@ -704,11 +643,9 @@ class LabReportReleaseView(APIView):
             "panelId": str(report.panel_id),
         }
         
-        # Notify ordering doctor
         if ordering_doctor_id:
             emit_lab_result_released(rel_payload, user_id=str(ordering_doctor_id))
         
-        # Notify assigned doctor if different
         if assigned_doctor_id and str(assigned_doctor_id) != str(ordering_doctor_id):
             emit_lab_result_released(rel_payload, user_id=str(assigned_doctor_id))
 
@@ -720,7 +657,6 @@ class LabReportReleaseView(APIView):
         patient = report.patient
 
         if report_has_critical:
-            # Integration: Target the ordering doctor
             ordering_doctor_id = report.panel.order.ordered_by_id if report.panel.order else None
             
             payload = {
@@ -731,19 +667,15 @@ class LabReportReleaseView(APIView):
                 "panelId": str(report.panel_id),
             }
 
-            # Notify ordering doctor
             if ordering_doctor_id:
                 emit_lab_critical_result(payload, user_id=str(ordering_doctor_id))
             
-            # Notify assigned doctor if different
             assigned_doctor_id = report.patient.assigned_doctor_id
             if assigned_doctor_id and str(assigned_doctor_id) != str(ordering_doctor_id):
                 emit_lab_critical_result(payload, user_id=str(assigned_doctor_id))
             
-            # If no target doctor at all, fallback to role-based
             if not ordering_doctor_id and not assigned_doctor_id:
                 emit_lab_critical_result(payload)
-            # panel__results already prefetched
             for result in critical_results:
                 _create_cdss_panic_value(result, patient.id)
                 CriticalValue.objects.get_or_create(
@@ -759,7 +691,6 @@ class LabReportReleaseView(APIView):
                 )
 
         return Response(LabReportSerializer(report, context={"request": request}).data)
-
 
 class LabReportCorrectView(APIView):
     permission_classes = [IsAuthenticated, IsLabTech]
@@ -777,7 +708,6 @@ class LabReportCorrectView(APIView):
         report.correction_note = note
         report.save(update_fields=["status", "corrected_at", "correction_note"])
         return Response(LabReportSerializer(report, context={"request": request}).data)
-
 
 class LabReportAttachmentView(APIView):
     permission_classes = [IsAuthenticated, IsLabTech]
@@ -805,11 +735,6 @@ class LabReportAttachmentView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
-# ---------------------------------------------------------------------------
-# Critical Values
-# ---------------------------------------------------------------------------
-
 class CriticalValueListView(APIView):
     permission_classes = [IsAuthenticated, LabReadWritePermission]
 
@@ -824,7 +749,6 @@ class CriticalValueListView(APIView):
         return paginator.get_paginated_response(
             CriticalValueSerializer(page, many=True, context={"request": request}).data
         )
-
 
 class CriticalValueNotifyView(APIView):
     """POST /lab/critical/:resultId/notify"""
@@ -854,7 +778,6 @@ class CriticalValueNotifyView(APIView):
             {"action": "notify", "notifiedTo": notified_to}, AuditSeverity.HIGH,
         )
         return Response(CriticalValueSerializer(cv, context={"request": request}).data)
-
 
 class CriticalValueAcknowledgeView(APIView):
     """

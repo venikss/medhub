@@ -22,10 +22,9 @@ export function filterForDoctor(recs: CDSSRecommendation[]): CDSSRecommendation[
     if (r.targetRoles && r.targetRoles.length > 0) {
       return r.targetRoles.includes(DOCTOR_ROLE);
     }
-    // Legacy / untagged: show based on source module or type match
     if (r.sourceModule) {
       return r.sourceModule === "doctor" || DOCTOR_TYPES.includes(r.type);
     }
-    return true; // fully untagged: show to all (legacy behaviour)
+    return true;
   });
 }

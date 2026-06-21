@@ -11,10 +11,6 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 import datetime
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
 def set_cell_bg(cell, hex_color):
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
@@ -58,7 +54,6 @@ def add_table(doc, headers, rows, col_widths=None):
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.LEFT
-    # Header row
     hrow = table.rows[0]
     for i, h in enumerate(headers):
         cell = hrow.cells[i]
@@ -69,7 +64,6 @@ def add_table(doc, headers, rows, col_widths=None):
         run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
         run.font.size = Pt(9)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    # Data rows
     for ri, row in enumerate(rows):
         tr = table.rows[ri + 1]
         bg = "EEF2FF" if ri % 2 == 0 else "FFFFFF"
@@ -79,7 +73,6 @@ def add_table(doc, headers, rows, col_widths=None):
             p = cell.paragraphs[0]
             run = p.add_run(str(val))
             run.font.size = Pt(9)
-    # Column widths
     if col_widths:
         for i, w in enumerate(col_widths):
             for row in table.rows:
@@ -111,26 +104,16 @@ def add_note(doc, text, color="FFF9C4"):
     run.font.color.rgb = RGBColor(0x4A, 0x4A, 0x00)
     return p
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Document Setup
-# ─────────────────────────────────────────────────────────────────────────────
-
 doc = Document()
 
-# Margins
 for section in doc.sections:
     section.top_margin    = Cm(2.0)
     section.bottom_margin = Cm(2.0)
     section.left_margin   = Cm(2.5)
     section.right_margin  = Cm(2.5)
 
-# Default paragraph font
 doc.styles["Normal"].font.name = "Calibri"
 doc.styles["Normal"].font.size = Pt(10)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# COVER PAGE
-# ─────────────────────────────────────────────────────────────────────────────
 
 title_para = doc.add_paragraph()
 title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -162,10 +145,6 @@ run.italic = True
 
 doc.add_page_break()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TABLE OF CONTENTS (manual)
-# ─────────────────────────────────────────────────────────────────────────────
-
 add_heading(doc, "Table of Contents", level=1)
 toc_items = [
     ("1", "Project Overview"),
@@ -196,10 +175,6 @@ for num, title in toc_items:
 
 doc.add_page_break()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 1 — PROJECT OVERVIEW
-# ─────────────────────────────────────────────────────────────────────────────
-
 add_heading(doc, "1. Project Overview")
 add_para(doc,
     "MedHub is a comprehensive, multi-role virtual hospital management system. "
@@ -225,10 +200,6 @@ add_table(doc,
     col_widths=[1.1, 1.3, 1.5, 3.2])
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 2 — TECH STACK & CONVENTIONS
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "2. Technology Stack & Conventions")
 
@@ -258,10 +229,6 @@ add_bullet(doc, "Authentication: Bearer JWT in Authorization header")
 add_bullet(doc, "Role filtering: backend MUST enforce role-based access — never trust the frontend to filter sensitive data")
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 3 — AUTHENTICATION & AUTHORIZATION
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "3. Authentication & Authorization")
 
@@ -304,10 +271,6 @@ add_para(doc, "Each endpoint must be protected so only the appropriate roles can
 add_note(doc, "The frontend DOES NOT filter data by role — it trusts the API to return only what that role is entitled to see.")
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 4 — GLOBAL SHARED TYPES
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "4. Global Shared Types")
 add_para(doc, "The following enumerations and models are shared across multiple modules.")
@@ -364,10 +327,6 @@ add_table(doc,
     col_widths=[1.3, 1.2, 0.7, 4.0])
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 5 — FRONT DESK / ADT
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "5. Module 1 — Front Desk / ADT Portal")
 add_para(doc, "Accessible by: front_desk (primary), admins. Covers patient registration, "
@@ -441,10 +400,6 @@ add_table(doc,
     col_widths=[0.7, 2.5, 4.0])
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 6 — DOCTOR PORTAL
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "6. Module 2 — Doctor Portal")
 add_para(doc, "Accessible by: doctor. Covers schedule, patient chart (SOAP encounters), "
@@ -551,10 +506,6 @@ add_table(doc,
     col_widths=[0.7, 2.6, 3.9])
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 7 — NURSE PORTAL
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "7. Module 3 — Nurse Portal")
 add_para(doc, "Accessible by: nurse. Covers ward census, vitals flowsheet, intake/output, "
@@ -682,10 +633,6 @@ add_table(doc,
 
 doc.add_page_break()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 8 — LABORATORY (LIS)
-# ─────────────────────────────────────────────────────────────────────────────
-
 add_heading(doc, "8. Module 4 — Laboratory (LIS) Portal")
 add_para(doc, "Accessible by: lab_tech (primary), doctor (results view). Covers specimen management, "
     "accession, analyzer queue, result entry, verification, critical value notification, "
@@ -807,10 +754,6 @@ add_note(doc, "Critical value notifications must also be sent via WebSocket even
 
 doc.add_page_break()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 9 — RADIOLOGY (RIS/PACS)
-# ─────────────────────────────────────────────────────────────────────────────
-
 add_heading(doc, "9. Module 5 — Radiology (RIS/PACS) Portal")
 add_para(doc, "Accessible by: radiologist (primary), doctor (results). Covers imaging orders, "
     "protocoling, scheduling, study acquisition, PACS viewing, reporting, critical findings, "
@@ -898,10 +841,6 @@ add_table(doc,
     col_widths=[0.7, 2.3, 4.2])
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 10 — PHARMACY
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "10. Module 6 — Pharmacy Portal")
 add_para(doc, "Accessible by: pharmacist (primary), doctor (prescription view). Covers prescription queue, "
@@ -1024,10 +963,6 @@ add_table(doc,
 
 doc.add_page_break()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 11 — BILLING
-# ─────────────────────────────────────────────────────────────────────────────
-
 add_heading(doc, "11. Module 7 — Billing / Revenue Cycle Portal")
 add_para(doc, "Accessible by: billing_staff (primary). Covers patient accounts, invoices, "
     "insurance claims, payments, denials, and financial event timeline.")
@@ -1144,10 +1079,6 @@ add_table(doc,
     col_widths=[0.7, 1.8, 4.7])
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 12 — ADMIN PORTAL
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "12. Module 8 — Admin Portal")
 add_para(doc, "Accessible by: admin only. Covers user management, role permissions, departments, "
@@ -1288,10 +1219,6 @@ add_table(doc,
     col_widths=[0.7, 1.8, 4.7])
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 13 — CDSS
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "13. Module 9 — CDSS (Clinical Decision Support System)")
 add_para(doc,
@@ -1481,10 +1408,6 @@ add_note(doc, "The frontend also has client-side adapter filtering as a UX layer
 
 doc.add_page_break()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 14 — PATIENT PORTAL
-# ─────────────────────────────────────────────────────────────────────────────
-
 add_heading(doc, "14. Module 10 — Patient Self-Service Portal")
 add_para(doc, "Accessible by: patient role only. Read-heavy, limited write access.")
 
@@ -1507,10 +1430,6 @@ add_table(doc,
 add_note(doc, "Patient portal must never expose draft encounters, unsigned notes, pending lab results, or other clinician-facing data.")
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 15 — REAL-TIME & NOTIFICATIONS
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "15. Real-Time & Notification Requirements")
 
@@ -1540,10 +1459,6 @@ add_para(doc, "For mobile or installable PWA: implement Web Push (VAPID) or FCM 
 
 doc.add_page_break()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 16 — PAGINATION, FILTERING & SEARCH
-# ─────────────────────────────────────────────────────────────────────────────
-
 add_heading(doc, "16. Pagination, Filtering & Search Conventions")
 
 add_heading(doc, "16.1 List Endpoint Query Parameters", level=2)
@@ -1571,10 +1486,6 @@ add_code(doc, "  totalPages: number      // Math.ceil(total / limit)")
 add_code(doc, "}")
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 17 — ERROR RESPONSE FORMAT
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "17. Error Response Format")
 add_para(doc, "All error responses must use the following standardised body regardless of HTTP status code:")
@@ -1604,10 +1515,6 @@ add_table(doc,
 
 doc.add_page_break()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 18 — AUDIT LOGGING
-# ─────────────────────────────────────────────────────────────────────────────
-
 add_heading(doc, "18. Audit Logging Requirements")
 add_para(doc,
     "Every API action that creates, reads (PHI), updates, or deletes data must be captured in the audit log. "
@@ -1632,10 +1539,6 @@ add_note(doc, "HIPAA compliance: retain audit logs for a minimum of 6 years. Log
 
 doc.add_page_break()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 19 — FILE UPLOADS
-# ─────────────────────────────────────────────────────────────────────────────
-
 add_heading(doc, "19. File / Document Upload")
 add_table(doc,
     ["Use Case", "Endpoint", "Notes"],
@@ -1650,10 +1553,6 @@ add_table(doc,
 add_para(doc, "All file upload responses must return: { fileUrl: string, fileId: string, uploadedAt: string }")
 
 doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 20 — ENDPOINT CHECKLIST
-# ─────────────────────────────────────────────────────────────────────────────
 
 add_heading(doc, "20. Summary Endpoint Checklist")
 add_para(doc, "Complete list of all endpoints the frontend consumes, grouped by module.")
@@ -1895,10 +1794,6 @@ for section_name, endpoints in modules_checklist:
 
 doc.add_page_break()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CLOSING NOTE
-# ─────────────────────────────────────────────────────────────────────────────
-
 add_heading(doc, "Notes & Implementation Guidance")
 add_para(doc,
     "This document was generated directly from the frontend TypeScript types, Zustand stores, "
@@ -1921,10 +1816,6 @@ run = p.add_run(f"— End of Specification — Generated {datetime.datetime.now(
 run.font.size = Pt(9)
 run.font.color.rgb = RGBColor(0xAA, 0xAA, 0xAA)
 run.italic = True
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SAVE
-# ─────────────────────────────────────────────────────────────────────────────
 
 out_path = "/Users/khaledsamy/Graduation Project/frontend copy/VirtualHospital_Backend_Spec.docx"
 doc.save(out_path)

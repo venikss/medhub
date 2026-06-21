@@ -4,7 +4,6 @@ from apps.administration.models import RadiologyCatalogItem
 from apps.pharmacy.models import FormularyItem
 from .models import Encounter, ImagingBodyPart, Laterality, Order, Prescription, SpecimenType
 
-
 MEDICATION_ROUTE_CHOICES = [
     ("oral", "Oral"),
     ("iv", "IV"),
@@ -18,7 +17,6 @@ MEDICATION_ROUTE_CHOICES = [
     ("other", "Other"),
 ]
 
-
 def build_formulary_medication_choices():
     items = FormularyItem.objects.order_by("name", "generic_name")
     choices = [("", "---------")]
@@ -28,7 +26,6 @@ def build_formulary_medication_choices():
             label = f"{item.name} ({item.generic_name})"
         choices.append((item.name, label))
     return choices
-
 
 class OrderAdminForm(forms.ModelForm):
     encounter_patient_name = forms.CharField(
@@ -132,7 +129,6 @@ class OrderAdminForm(forms.ModelForm):
             self.add_error("name", "Lab orders still need a test name.")
 
         return cleaned
-
 
 class PrescriptionAdminForm(forms.ModelForm):
     encounter_patient_name = forms.CharField(

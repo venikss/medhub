@@ -6,7 +6,6 @@ Fixed: patientName and patientMRN denormalized into recommendation output (spec 
 from rest_framework import serializers
 from .models import CDSSConsultRequest, CDSSOutputKind, CDSSRecommendation, CDSSOverrideRecord
 
-
 class CDSSRecommendationSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         consult_request = attrs.get("consult_request")
@@ -39,7 +38,6 @@ class CDSSRecommendationSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
 
-        # Denormalized patient info required by spec
         patient_name = ""
         patient_mrn = ""
         if instance.patient_id:
@@ -87,7 +85,6 @@ class CDSSRecommendationSerializer(serializers.ModelSerializer):
             "createdAt": data["created_at"],
         }
 
-
 class CDSSConsultRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = CDSSConsultRequest
@@ -127,7 +124,6 @@ class CDSSConsultRequestSerializer(serializers.ModelSerializer):
             "createdAt": data["created_at"],
         }
 
-
 class CDSSOverrideRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = CDSSOverrideRecord
@@ -136,9 +132,18 @@ class CDSSOverrideRecordSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
+        rec = instance.recommendation
+        patient = getattr(rec, "patient", None) if rec else None
+        patient_name = ""
+        patient_id = ""
+        if patient:
+            patient_name = f"{patient.first_name} {patient.last_name}".strip() or patient.mrn
+            patient_id = str(patient.id)
         return {
             "id": data["id"],
             "recommendationId": data["recommendation"],
+            "patientId": patient_id,
+            "patientName": patient_name,
             "action": data["action"],
             "reasonCategory": data["reason_category"],
             "reason": data["reason"],

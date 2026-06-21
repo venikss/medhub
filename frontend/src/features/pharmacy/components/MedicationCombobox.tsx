@@ -41,8 +41,6 @@ interface MedicationComboboxProps {
   disabled?: boolean;
 }
 
-// ─── Colour helpers ───────────────────────────────────────────────────────────
-
 const formularyStatusColor: Record<string, string> = {
   formulary: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
   "non-formulary": "bg-amber-500/10 text-amber-700 border-amber-500/20",
@@ -63,8 +61,6 @@ function displayLabel(v: MedicationSelection): string {
   return v.genericName || v.displayName || v.brandNames[0] || "Medication";
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export function MedicationCombobox({
   value,
   onSelect,
@@ -83,7 +79,6 @@ export function MedicationCombobox({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // ── Close on outside click ──
   useEffect(() => {
     function onOutside(e: MouseEvent) {
       const target = e.target as Node;
@@ -100,7 +95,6 @@ export function MedicationCombobox({
     return () => document.removeEventListener("mousedown", onOutside);
   }, [open]);
 
-  // ── Focus search input when opened ──
   useEffect(() => {
     if (!open) return;
 
@@ -132,7 +126,6 @@ export function MedicationCombobox({
     }
   }, [open]);
 
-  // ── Debounced formulary fetch ──
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(async () => {

@@ -3,13 +3,11 @@
 from apps.authentication.models import UserRole
 from .models import FormularyItem, PharmacyPrescription, DispenseRecord, PharmacyIntervention, Refill, Substitution
 
-
 PRIORITY_CHOICES = [
     ("routine", "Routine"),
     ("urgent", "Urgent"),
     ("stat", "STAT"),
 ]
-
 
 def build_formulary_medication_choices():
     items = FormularyItem.objects.order_by("name", "generic_name")
@@ -20,7 +18,6 @@ def build_formulary_medication_choices():
             label = f"{item.name} ({item.generic_name})"
         choices.append((item.name, label))
     return choices
-
 
 class PharmacyPrescriptionAdminForm(forms.ModelForm):
     priority = forms.ChoiceField(required=False, choices=PRIORITY_CHOICES)
@@ -41,7 +38,6 @@ class PharmacyPrescriptionAdminForm(forms.ModelForm):
         if original_prescription and not cleaned.get("priority"):
             cleaned["priority"] = getattr(original_prescription, "priority", "routine") or "routine"
         return cleaned
-
 
 class DispenseRecordAdminForm(forms.ModelForm):
     class Meta:
@@ -66,7 +62,6 @@ class DispenseRecordAdminForm(forms.ModelForm):
         if prescription and not cleaned.get("patient"):
             cleaned["patient"] = prescription.patient
         return cleaned
-
 
 class PharmacyInterventionAdminForm(forms.ModelForm):
     class Meta:
@@ -94,7 +89,6 @@ class PharmacyInterventionAdminForm(forms.ModelForm):
                 cleaned["prescriber_contact"] = doctor.full_name or doctor.email
         return cleaned
 
-
 class RefillAdminForm(forms.ModelForm):
     class Meta:
         model = Refill
@@ -119,7 +113,6 @@ class RefillAdminForm(forms.ModelForm):
             cleaned["patient"] = prescription.patient
         return cleaned
 
-
 class SubstitutionAdminForm(forms.ModelForm):
     substitute_medication = forms.ChoiceField(required=False, choices=())
 
@@ -142,8 +135,4 @@ class SubstitutionAdminForm(forms.ModelForm):
         cleaned["approved_by"] = None
         cleaned["requested_by"] = None
         return cleaned
-
-
-
-
 

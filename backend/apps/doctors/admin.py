@@ -4,7 +4,6 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from urllib.parse import urlencode
 
-
 class RoleRestrictedAdminMixin:
     required_role = None
     view_roles = ()
@@ -31,12 +30,9 @@ class RoleRestrictedAdminMixin:
     def has_delete_permission(self, request, obj=None):
         return self._can_edit(request)
 
-
-
 from .forms import OrderAdminForm, PrescriptionAdminForm
 from .views import _sync_pharmacy_prescription_from_doctor_rx, _sync_radiology_order_from_doctor_order
 from .models import Encounter, Diagnosis, Order, Prescription, Referral
-
 
 @admin.register(Encounter)
 class EncounterAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
@@ -57,7 +53,6 @@ class EncounterAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
         if not obj.doctor_id and getattr(request.user, "role", None) == UserRole.DOCTOR:
             obj.doctor = request.user
         super().save_model(request, obj, form, change)
-
 
 @admin.register(Diagnosis)
 class DiagnosisAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
@@ -80,7 +75,6 @@ class DiagnosisAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
         if not obj.diagnosed_by_id and getattr(request.user, "role", None) == UserRole.DOCTOR:
             obj.diagnosed_by = request.user
         super().save_model(request, obj, form, change)
-
 
 @admin.register(Order)
 class OrderAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
@@ -129,7 +123,6 @@ class OrderAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
             url = reverse("admin:doctors_order_add")
             return HttpResponseRedirect(f"{url}?{urlencode({'encounter': str(obj.encounter_id)})}")
         return super().response_add(request, obj, post_url_continue)
-
 
 @admin.register(Prescription)
 class PrescriptionAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
@@ -185,7 +178,6 @@ class PrescriptionAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
         super().save_model(request, obj, form, change)
         _sync_pharmacy_prescription_from_doctor_rx(obj)
 
-
 @admin.register(Referral)
 class ReferralAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     required_role = UserRole.DOCTOR
@@ -205,15 +197,4 @@ class ReferralAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
         if not obj.referring_doctor_id and getattr(request.user, "role", None) == UserRole.DOCTOR:
             obj.referring_doctor = request.user
         super().save_model(request, obj, form, change)
-
-
-
-
-
-
-
-
-
-
-
 

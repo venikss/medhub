@@ -22,7 +22,6 @@ from .serializers import (
     CLAIM_STATUS_FROM_API, DENIAL_STATUS_FROM_API,
 )
 
-
 class BillingDashboardView(APIView):
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin]
 
@@ -47,11 +46,6 @@ class BillingDashboardView(APIView):
             "billedToday": Invoice.objects.filter(created_at__date=today).count(),
         })
 
-
-# ---------------------------------------------------------------------------
-# Patient Account Summary  (FIXED: was missing entirely)
-# ---------------------------------------------------------------------------
-
 class PatientAccountListView(APIView):
     """GET /billing/accounts  — list all patient account summaries."""
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin]
@@ -71,7 +65,6 @@ class PatientAccountListView(APIView):
         data = [_build_account_summary(p) for p in page]
         return paginator.get_paginated_response(data)
 
-
 class PatientAccountDetailView(APIView):
     """GET /billing/accounts/:patientId"""
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin]
@@ -83,7 +76,6 @@ class PatientAccountDetailView(APIView):
         except Patient.DoesNotExist:
             raise NotFoundError("Patient not found.")
         return Response(_build_account_summary(patient))
-
 
 def _build_account_summary(patient):
     invoices = Invoice.objects.filter(patient=patient)
@@ -106,7 +98,6 @@ def _build_account_summary(patient):
         "balanceDue": float(balance_due),
         "pendingClaims": pending_claims,
     }
-
 
 class PatientAccountTimelineView(APIView):
     """
@@ -155,11 +146,6 @@ class PatientAccountTimelineView(APIView):
         timeline.sort(key=lambda x: x["date"], reverse=True)
         return Response({"data": timeline, "total": len(timeline)})
 
-
-# ---------------------------------------------------------------------------
-# Invoices
-# ---------------------------------------------------------------------------
-
 class InvoiceListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin]
 
@@ -192,7 +178,6 @@ class InvoiceListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class InvoiceDetailView(APIView):
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin]
 
@@ -215,7 +200,6 @@ class InvoiceDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(InvoiceSerializer(invoice, context={"request": request}).data)
-
 
 class InvoiceSendView(APIView):
     """
@@ -250,7 +234,6 @@ class InvoiceSendView(APIView):
         write_audit_log(request, AuditAction.UPDATE, "Invoice", str(invoice.id), {"action": "send"})
         return Response(InvoiceSerializer(invoice, context={"request": request}).data)
 
-
 class InvoiceVoidView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
@@ -273,11 +256,6 @@ class InvoiceVoidView(APIView):
             {"action": "void", "reason": reason}, AuditSeverity.HIGH,
         )
         return Response(InvoiceSerializer(invoice, context={"request": request}).data)
-
-
-# ---------------------------------------------------------------------------
-# Claims
-# ---------------------------------------------------------------------------
 
 class ClaimListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin]
@@ -311,7 +289,6 @@ class ClaimListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class ClaimDetailView(APIView):
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin]
 
@@ -332,7 +309,6 @@ class ClaimDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(ClaimSerializer(claim, context={"request": request}).data)
-
 
 class ClaimStatusView(APIView):
     """
@@ -373,7 +349,6 @@ class ClaimStatusView(APIView):
         )
         return Response(ClaimSerializer(claim, context={"request": request}).data)
 
-
 class ClaimSubmitView(APIView):
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin]
 
@@ -396,7 +371,6 @@ class ClaimSubmitView(APIView):
         claim.save(update_fields=["status", "submitted_at"])
         write_audit_log(request, AuditAction.UPDATE, "Claim", str(claim.id), {"action": "submit"})
         return Response(ClaimSerializer(claim, context={"request": request}).data)
-
 
 class ClaimResubmitView(APIView):
     """
@@ -422,11 +396,6 @@ class ClaimResubmitView(APIView):
         )
         return Response(ClaimSerializer(claim, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Payments
-# ---------------------------------------------------------------------------
-
 class PaymentListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin | IsFrontDesk]
 
@@ -444,7 +413,6 @@ class PaymentListCreateView(APIView):
                 | Q(payer__icontains=q)
                 | Q(reference_number__icontains=q)
             )
-        # FIXED: was ordering by paid_at (non-existent); correct field is posted_at
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs.order_by("-posted_at"), request)
         return paginator.get_paginated_response(
@@ -476,7 +444,6 @@ class PaymentListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class PaymentVoidView(APIView):
     """
     PUT /billing/payments/:id/void
@@ -499,7 +466,6 @@ class PaymentVoidView(APIView):
         payment.void_reason = reason
         payment.save(update_fields=["voided", "voided_at", "void_reason"])
 
-        # Reverse the balance impact on the invoice
         if payment.invoice_id:
             try:
                 invoice = Invoice.objects.get(id=payment.invoice_id)
@@ -522,11 +488,6 @@ class PaymentVoidView(APIView):
             {"action": "void", "reason": reason}, AuditSeverity.HIGH,
         )
         return Response(PaymentSerializer(payment, context={"request": request}).data)
-
-
-# ---------------------------------------------------------------------------
-# Denials
-# ---------------------------------------------------------------------------
 
 class DenialListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin]
@@ -563,7 +524,6 @@ class DenialListCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class DenialDetailView(APIView):
     """
     GET /billing/denials/:id
@@ -590,7 +550,6 @@ class DenialDetailView(APIView):
         serializer.save()
         write_audit_log(request, AuditAction.UPDATE, "Denial", str(denial.id))
         return Response(DenialSerializer(denial, context={"request": request}).data)
-
 
 class DenialAppealView(APIView):
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin]
@@ -620,11 +579,6 @@ class DenialAppealView(APIView):
         write_audit_log(request, AuditAction.UPDATE, "Denial", str(denial.id), {"action": "appeal"})
         return Response(DenialSerializer(denial, context={"request": request}).data)
 
-
-# ---------------------------------------------------------------------------
-# Billing Stats  (FIXED: all field names corrected to match spec)
-# ---------------------------------------------------------------------------
-
 class BillingStatsView(APIView):
     permission_classes = [IsAuthenticated, IsBillingStaff | IsAdmin]
 
@@ -634,40 +588,32 @@ class BillingStatsView(APIView):
         import datetime
         thirty_days_ago = today - datetime.timedelta(days=30)
 
-        # totalBilledToday
         total_billed_today = (
             Invoice.objects.filter(created_at__date=today)
             .aggregate(t=Sum("total_amount"))["t"] or 0
         )
-        # collectedToday
         collected_today = (
             Payment.objects.filter(posted_at__date=today, voided=False)
             .aggregate(t=Sum("amount"))["t"] or 0
         )
-        # pendingInsurance
         pending_insurance = (
             Invoice.objects.filter(status=BillingInvoiceStatus.BILLED_INSURANCE)
             .aggregate(t=Sum("balance"))["t"] or 0
         )
-        # patientBalanceDue
         patient_balance_due = (
             Invoice.objects.exclude(
                 status__in=[BillingInvoiceStatus.CLEARED, BillingInvoiceStatus.VOID]
             )
             .aggregate(t=Sum("balance"))["t"] or 0
         )
-        # pendingClaims
         pending_claims = Claim.objects.filter(
             status__in=[ClaimStatus.SUBMITTED, ClaimStatus.ACKNOWLEDGED, ClaimStatus.UNDER_REVIEW]
         ).count()
-        # deniedClaims
         denied_claims = Claim.objects.filter(status=ClaimStatus.DENIED).count()
-        # overdue30Days
         overdue_30_days = Invoice.objects.filter(
             status=BillingInvoiceStatus.OVERDUE,
             created_at__date__lte=thirty_days_ago,
         ).count()
-        # collectionRate
         total_billed = Invoice.objects.aggregate(t=Sum("total_amount"))["t"] or 1
         total_collected = (
             Payment.objects.filter(voided=False).aggregate(t=Sum("amount"))["t"] or 0

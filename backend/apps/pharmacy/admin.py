@@ -1,7 +1,6 @@
 ﻿from django.contrib import admin
 from apps.authentication.models import UserRole
 
-
 class RoleRestrictedAdminMixin:
     required_role = None
     view_roles = ()
@@ -28,8 +27,6 @@ class RoleRestrictedAdminMixin:
     def has_delete_permission(self, request, obj=None):
         return self._can_edit(request)
 
-
-
 from .forms import (
     PharmacyPrescriptionAdminForm,
     DispenseRecordAdminForm,
@@ -38,7 +35,6 @@ from .forms import (
     SubstitutionAdminForm,
 )
 from .models import PharmacyPrescription, DrugWarning, FormularyItem, DispenseRecord, PharmacyIntervention, Refill, Substitution
-
 
 @admin.register(PharmacyPrescription)
 class PharmacyPrescriptionAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
@@ -71,7 +67,6 @@ class PharmacyPrescriptionAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
                 readonly.extend(["status", "setting", "priority", "verification_notes"])
         return readonly
 
-
 @admin.register(DrugWarning)
 class DrugWarningAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     required_role = UserRole.PHARMACIST
@@ -85,7 +80,6 @@ class DrugWarningAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
-
 @admin.register(FormularyItem)
 class FormularyItemAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     required_role = UserRole.PHARMACIST
@@ -94,7 +88,6 @@ class FormularyItemAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     list_filter = ["formulary_status", "drug_class"]
     search_fields = ["name", "generic_name", "ndc"]
     readonly_fields = ["created_at", "updated_at"]
-
 
 @admin.register(DispenseRecord)
 class DispenseRecordAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
@@ -114,7 +107,6 @@ class DispenseRecordAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
             obj.dispensed_by = request.user
         super().save_model(request, obj, form, change)
 
-
 @admin.register(PharmacyIntervention)
 class PharmacyInterventionAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     required_role = UserRole.PHARMACIST
@@ -129,7 +121,6 @@ class PharmacyInterventionAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
         if not obj.pharmacist_id and getattr(request.user, "role", None) == UserRole.PHARMACIST:
             obj.pharmacist = request.user
         super().save_model(request, obj, form, change)
-
 
 @admin.register(Refill)
 class RefillAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
@@ -148,7 +139,6 @@ class RefillAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
             obj.pharmacist = request.user
         super().save_model(request, obj, form, change)
 
-
 @admin.register(Substitution)
 class SubstitutionAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
     required_role = UserRole.PHARMACIST
@@ -163,10 +153,4 @@ class SubstitutionAdmin(RoleRestrictedAdminMixin, admin.ModelAdmin):
         obj.requested_by = None
         obj.approved_by = None
         super().save_model(request, obj, form, change)
-
-
-
-
-
-
 

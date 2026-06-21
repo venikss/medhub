@@ -76,7 +76,7 @@ export default function PatientCDSSPage({ params }: PatientCDSSPageProps) {
   const fallbackPatientName = patientRecord
     ? [patientRecord.firstName, patientRecord.lastName].filter(Boolean).join(" ").trim()
     : "";
-  const patientName = patientRecs[0]?.patientName ?? fallbackPatientName || "Unknown patient";
+  const patientName = (patientRecs[0]?.patientName ?? fallbackPatientName) || "Unknown patient";
   const patientMRN = patientRecs[0]?.patientMRN ?? patientRecord?.mrn ?? "—";
 
   const activeRecs = patientRecs.filter((r) => r.status === "active");

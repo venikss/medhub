@@ -9,13 +9,11 @@ from django.core.validators import RegexValidator
 from core.models import SoftDeleteModel, TimeStampedModel
 from core.utils import generate_mrn, generate_queue_ticket
 
-
 class Gender(models.TextChoices):
     MALE = "male", "Male"
     FEMALE = "female", "Female"
     OTHER = "other", "Other"
     PREFER_NOT_TO_SAY = "prefer_not_to_say", "Prefer not to say"
-
 
 class BloodType(models.TextChoices):
     A_POS = "A+", "A+"
@@ -27,14 +25,12 @@ class BloodType(models.TextChoices):
     O_POS = "O+", "O+"
     O_NEG = "O-", "O-"
 
-
 class PatientStatus(models.TextChoices):
     ACTIVE = "active", "Active"
-    ADMITTED = "admitted", "Admitted"       # FIXED: was missing, used in views
+    ADMITTED = "admitted", "Admitted"
     DISCHARGED = "discharged", "Discharged"
     CRITICAL = "critical", "Critical"
     STABLE = "stable", "Stable"
-
 
 class MaritalStatus(models.TextChoices):
     SINGLE = "single", "Single"
@@ -42,13 +38,11 @@ class MaritalStatus(models.TextChoices):
     DIVORCED = "divorced", "Divorced"
     WIDOWED = "widowed", "Widowed"
 
-
 class PreferredLanguage(models.TextChoices):
     ARABIC = "arabic", "Arabic"
     ENGLISH = "english", "English"
     FRENCH = "french", "French"
     OTHER = "other", "Other"
-
 
 class Patient(SoftDeleteModel):
     """Patient aggregate root with ADT fields."""
@@ -116,22 +110,17 @@ class Patient(SoftDeleteModel):
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
 
-
-# ─── Admissions ────────────────────────────────────────────────────────────────
-
 class AdmissionType(models.TextChoices):
     INPATIENT = "inpatient", "Inpatient"
     OUTPATIENT = "outpatient", "Outpatient"
     EMERGENCY = "emergency", "Emergency"
     OBSERVATION = "observation", "Observation"
 
-
 class AdmissionStatus(models.TextChoices):
     ACTIVE = "active", "Active"
     DISCHARGED = "discharged", "Discharged"
     TRANSFERRED = "transferred", "Transferred"
     CANCELLED = "cancelled", "Cancelled"
-
 
 class Admission(TimeStampedModel):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="admissions")
@@ -172,7 +161,6 @@ class Admission(TimeStampedModel):
     def __str__(self):
         return f"Admission - {self.patient.full_name} [{self.status}]"
 
-
 class AdmissionTransfer(TimeStampedModel):
     admission = models.ForeignKey(Admission, on_delete=models.CASCADE, related_name="transfers")
     from_ward = models.ForeignKey(
@@ -203,9 +191,6 @@ class AdmissionTransfer(TimeStampedModel):
     def __str__(self):
         return f"Transfer - {self.admission.patient.full_name}"
 
-
-# ─── Queue ─────────────────────────────────────────────────────────────────────
-
 class QueueStatus(models.TextChoices):
     WAITING = "waiting", "Waiting"
     CALLED = "called", "Called"
@@ -213,12 +198,10 @@ class QueueStatus(models.TextChoices):
     COMPLETED = "completed", "Completed"
     NO_SHOW = "no-show", "No Show"
 
-
 class QueuePriority(models.TextChoices):
     NORMAL = "normal", "Normal"
     URGENT = "urgent", "Urgent"
     EMERGENCY = "emergency", "Emergency"
-
 
 class Queue(TimeStampedModel):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="queue_tickets")
@@ -249,16 +232,12 @@ class Queue(TimeStampedModel):
     def __str__(self):
         return f"{self.ticket_number} - {self.patient.full_name}"
 
-
-# ─── Appointments ──────────────────────────────────────────────────────────────
-
 class AppointmentStatus(models.TextChoices):
     SCHEDULED = "scheduled", "Scheduled"
     IN_PROGRESS = "in-progress", "In Progress"
     COMPLETED = "completed", "Completed"
     CANCELLED = "cancelled", "Cancelled"
     NO_SHOW = "no-show", "No Show"
-
 
 class Appointment(SoftDeleteModel):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="appointments")
@@ -288,14 +267,10 @@ class Appointment(SoftDeleteModel):
     def __str__(self):
         return f"Appointment - {self.patient.full_name} - {self.date}"
 
-
-# ─── Consents ─────────────────────────────────────────────────────────────────
-
 class ConsentStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     SIGNED = "signed", "Signed"
     DECLINED = "declined", "Declined"
-
 
 class Consent(TimeStampedModel):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="consents")

@@ -21,7 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { FormularyItem } from "@/types";
 import { cn } from "@/lib/utils";
 
-// Map formulary form → route string used by backend
 const FORM_TO_ROUTE: Record<string, string> = {
   tablet: "oral",
   capsule: "oral",
@@ -142,7 +141,6 @@ function PrescriptionsInner() {
     setMessage(null);
 
     if (!isCustomMedication(item)) {
-      // Auto-fill from formulary data
       const strength = item.strengths[0] ?? "";
       const route = routeFromFormularyItem(item);
       setDraft((prev) => ({

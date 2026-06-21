@@ -4,7 +4,6 @@ import type { BillingInvoiceStatus, ClaimStatus, DenialStatus } from "@/types";
 type AnyStatus = BillingInvoiceStatus | ClaimStatus | DenialStatus;
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  // Invoice
   draft:            { label: "Draft",           className: "bg-gray-100 text-gray-700" },
   sent:             { label: "Sent",             className: "bg-blue-100 text-blue-700" },
   billed_insurance: { label: "Billed Insurance", className: "bg-purple-100 text-purple-700" },
@@ -14,7 +13,6 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   cleared:          { label: "Cleared",          className: "bg-green-100 text-green-700" },
   void:             { label: "Void",             className: "bg-gray-200 text-gray-500" },
 
-  // Claim
   submitted:        { label: "Submitted",        className: "bg-blue-100 text-blue-700" },
   acknowledged:     { label: "Acknowledged",     className: "bg-indigo-100 text-indigo-700" },
   pending:          { label: "Pending",          className: "bg-amber-100 text-amber-700" },
@@ -23,7 +21,6 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   denied:           { label: "Denied",           className: "bg-red-100 text-red-700" },
   appealed:         { label: "Appealed",         className: "bg-purple-100 text-purple-700" },
 
-  // Denial
   pending_appeal:   { label: "Pending Appeal",   className: "bg-orange-100 text-orange-700" },
   upheld:           { label: "Upheld",           className: "bg-red-100 text-red-700" },
   overturned:       { label: "Overturned",       className: "bg-green-100 text-green-700" },
